@@ -12,7 +12,6 @@ function createOpenAIClient() {
   return new OpenAI({
     baseURL: 'https://api.deepseek.com',
     apiKey: apiKey,
-    timeout: 9000, // 设置9秒超时，留1秒给Netlify处理
   });
 }
 
@@ -68,8 +67,8 @@ JSON格式，每个回应40-60字：
 
     console.log('Calling DeepSeek API for responses...');
     
-    // 使用 Promise.race 来实现更严格的超时控制
-    const apiCall = openai.chat.completions.create({
+    // 直接调用API，不设置人为超时
+    const completion = await openai.chat.completions.create({
       messages: [{ 
         role: "user",
         content: prompt
@@ -80,12 +79,6 @@ JSON格式，每个回应40-60字：
       top_p: 0.7, // 平衡质量和速度
       stream: false,
     });
-
-    const timeoutPromise = new Promise((_, reject) => {
-      setTimeout(() => reject(new Error('API call timeout')), 6000); // 6秒超时
-    });
-
-    const completion = await Promise.race([apiCall, timeoutPromise]) as any;
     
     console.log('API call successful, processing response...');
     const response = completion.choices[0].message.content;
