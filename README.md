@@ -1,3 +1,7 @@
+# 🌐 [一键访问 → xpua.org](https://xpua.org)
+
+---
+
 # 反PUA大师 (Anti-PUA Master)
 
 一个帮助识别和应对PUA（Pick-up Artist）操控性语言的Web应用程序。
