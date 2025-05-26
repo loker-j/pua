@@ -1,6 +1,62 @@
 import { NextResponse } from 'next/server';
 import OpenAI from "openai";
 
+// 本地分析函数作为备用方案
+function localAnalyze(text: string) {
+  const lowerText = text.toLowerCase();
+  let category = 'general';
+  let severity = 5;
+  let puaTechniques = [];
+  let analysis = '';
+  
+  // 简单的关键词匹配
+  if (lowerText.includes('加班') || lowerText.includes('工作') || lowerText.includes('同事')) {
+    category = 'workplace';
+  } else if (lowerText.includes('爱') || lowerText.includes('感情') || lowerText.includes('男朋友') || lowerText.includes('女朋友')) {
+    category = 'relationship';
+  } else if (lowerText.includes('家') || lowerText.includes('父母') || lowerText.includes('妈妈') || lowerText.includes('爸爸')) {
+    category = 'family';
+  }
+  
+  // 检测PUA技巧
+  if (lowerText.includes('别人都') || lowerText.includes('大家都')) {
+    puaTechniques.push('比较操控');
+    severity += 2;
+    analysis = '通过与他人比较来制造压力和愧疚感';
+  }
+  
+  if (lowerText.includes('如果你真的') || lowerText.includes('如果你爱')) {
+    puaTechniques.push('情感勒索');
+    severity += 3;
+    analysis = '使用情感勒索来操控对方的行为';
+  }
+  
+  if (lowerText.includes('为什么你不') || lowerText.includes('你为什么不')) {
+    puaTechniques.push('质疑攻击');
+    severity += 1;
+    analysis = '通过质疑来让对方产生自我怀疑';
+  }
+  
+  severity = Math.min(severity, 10);
+  
+  if (puaTechniques.length === 0) {
+    puaTechniques = ['轻微操控'];
+    analysis = '语言中包含一定的操控性质';
+  }
+  
+  return {
+    category,
+    severity,
+    puaTechniques,
+    analysis,
+    responses: {
+      mild: "我理解你的观点，但我有自己的考虑。",
+      firm: "我不同意这种说法，每个人的情况不同。",
+      analytical: "这种比较是不公平的，我们应该理性地讨论具体问题。"
+    }
+  };
+}
+
 // 在函数内部初始化 OpenAI 客户端，而不是模块级别
 function createOpenAIClient() {
   const apiKey = process.env.DEEPSEEK_API_KEY || process.env.OPENAI_API_KEY;
@@ -12,11 +68,13 @@ function createOpenAIClient() {
   return new OpenAI({
     baseURL: 'https://api.deepseek.com',
     apiKey: apiKey,
-    timeout: 8000, // 设置8秒超时
+    timeout: 15000, // 设置15秒超时
   });
 }
 
 export async function POST(request: Request) {
+  let text = '';
+  
   try {
     // 检查是否有 API key
     const apiKey = process.env.DEEPSEEK_API_KEY || process.env.OPENAI_API_KEY;
@@ -41,28 +99,27 @@ export async function POST(request: Request) {
       });
     }
 
-    const { text } = await request.json();
+    const requestBody = await request.json();
+    text = requestBody.text;
     console.log('Analyzing text:', text);
     
     // 在这里初始化 OpenAI 客户端
     const openai = createOpenAIClient();
     console.log('OpenAI client created successfully');
     
-    // 简化的 prompt 以减少响应时间
-    const prompt = `分析以下话语的PUA程度并生成回应建议。
-
-话语：${text}
-
-请返回JSON格式：
+    // 极简化的 prompt 以最大化响应速度
+    const prompt = `分析："${text}"
+    
+返回JSON：
 {
-  "category": "workplace|relationship|family|general",
-  "severity": 1-10的数字,
-  "puaTechniques": ["识别的PUA技巧"],
-  "analysis": "简要分析",
+  "category": "workplace",
+  "severity": 6,
+  "puaTechniques": ["压力操控"],
+  "analysis": "通过比较制造压力",
   "responses": {
-    "mild": "温和回应",
-    "firm": "坚定回应", 
-    "analytical": "理性回应"
+    "mild": "我有自己的工作安排",
+    "firm": "我不会因为别人而改变我的计划", 
+    "analytical": "每个人的工作方式不同，不应该用别人来衡量"
   }
 }`;
 
@@ -75,12 +132,12 @@ export async function POST(request: Request) {
         content: prompt
       }],
       model: "deepseek-chat",
-      temperature: 0.3, // 降低温度以获得更一致的响应
-      max_tokens: 800,   // 限制响应长度
+      temperature: 0.1, // 进一步降低温度
+      max_tokens: 400,   // 进一步限制响应长度
     });
 
     const timeoutPromise = new Promise((_, reject) => {
-      setTimeout(() => reject(new Error('API call timeout')), 7000);
+      setTimeout(() => reject(new Error('API call timeout')), 12000); // 12秒超时
     });
 
     const completion = await Promise.race([apiCall, timeoutPromise]) as any;
@@ -146,16 +203,11 @@ export async function POST(request: Request) {
     
     // 根据错误类型返回不同的消息
     if (error.message && error.message.includes('timeout')) {
+      console.log('API timeout, using local analysis as fallback');
+      const localResult = localAnalyze(text);
       return NextResponse.json({
-        category: 'general',
-        severity: 5,
-        puaTechniques: ['超时'],
-        analysis: "AI分析超时，请稍后重试",
-        responses: {
-          mild: "抱歉，分析需要更多时间，请稍后重试。",
-          firm: "系统繁忙，请稍后再试。",
-          analytical: "当前网络较慢，建议稍后重新分析。"
-        }
+        ...localResult,
+        analysis: `${localResult.analysis}（使用本地分析）`
       });
     }
     
