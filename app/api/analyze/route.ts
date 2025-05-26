@@ -11,7 +11,8 @@ function createOpenAIClient() {
   
   return new OpenAI({
     baseURL: 'https://api.deepseek.com',
-    apiKey: apiKey
+    apiKey: apiKey,
+    timeout: 8000, // 设置8秒超时
   });
 }
 
@@ -47,52 +48,46 @@ export async function POST(request: Request) {
     const openai = createOpenAIClient();
     console.log('OpenAI client created successfully');
     
-    const prompt = `你是一个专业的心理学专家和反PUA顾问。请分析以下话语的PUA程度，并生成相应的反PUA回复。
+    // 简化的 prompt 以减少响应时间
+    const prompt = `分析以下话语的PUA程度并生成回应建议。
 
-需要分析的话语：${text}
+话语：${text}
 
-请按照以下步骤进行分析：
-
-1. 识别PUA技巧：分析这句话使用了哪些PUA技巧（如情感勒索、贬低、孤立、否定情感、转移责任、比较操控等）
-2. 评估严重程度：根据操控性、伤害性、紧急性评估1-10的严重程度
-3. 确定场景类别：判断是职场、感情、家庭还是通用场景
-4. 生成反PUA回复：根据PUA程度生成三种不同强度的反击回复
-
-回复原则：
-- 低程度PUA(1-3)：温和但明确地设立界限，保持关系和谐
-- 中程度PUA(4-7)：坚定地拒绝操控，明确表达自己的立场
-- 高程度PUA(8-10)：强硬反击，保护自己的心理健康，必要时考虑断绝关系
-
-请严格按照以下JSON格式返回：
-
+请返回JSON格式：
 {
-  "category": "workplace|relationship|family|general 中的一个",
-  "severity": "1到10之间的数字，表示PUA严重程度",
-  "puaTechniques": ["识别出的PUA技巧列表"],
-  "analysis": "简要分析这句话的操控性质",
+  "category": "workplace|relationship|family|general",
+  "severity": 1-10的数字,
+  "puaTechniques": ["识别的PUA技巧"],
+  "analysis": "简要分析",
   "responses": {
-    "mild": "温和但坚定的回应，适合轻度PUA",
-    "firm": "明确且直接的回应，适合中度PUA", 
-    "analytical": "理性分析并强硬反击，适合重度PUA"
+    "mild": "温和回应",
+    "firm": "坚定回应", 
+    "analytical": "理性回应"
   }
 }`;
 
-    console.log('Calling DeepSeek API...');
-    const completion = await openai.chat.completions.create({
+    console.log('Calling DeepSeek API with timeout...');
+    
+    // 使用 Promise.race 来实现更严格的超时控制
+    const apiCall = openai.chat.completions.create({
       messages: [{ 
-        role: "system", 
-        content: "你现在正在面对一个使用PUA话术的人。你需要保持清醒和坚定，用不同的方式回应他们的话语。你的回应应该既显示出对自我的尊重，又不会激化冲突。" 
-      }, {
         role: "user",
         content: prompt
       }],
       model: "deepseek-chat",
-      temperature: 0.7,
+      temperature: 0.3, // 降低温度以获得更一致的响应
+      max_tokens: 800,   // 限制响应长度
     });
 
+    const timeoutPromise = new Promise((_, reject) => {
+      setTimeout(() => reject(new Error('API call timeout')), 7000);
+    });
+
+    const completion = await Promise.race([apiCall, timeoutPromise]) as any;
+    
     console.log('API call successful, processing response...');
     const response = completion.choices[0].message.content;
-    console.log('Raw API response:', response);
+    console.log('Raw API response length:', response?.length);
     
     try {
       if (!response) {
@@ -101,39 +96,44 @@ export async function POST(request: Request) {
 
       const jsonMatch = response.match(/\{[\s\S]*\}/);
       if (!jsonMatch) {
+        console.log('No JSON found in response:', response);
         throw new Error('未找到JSON格式的响应');
       }
       
       const parsedResponse = JSON.parse(jsonMatch[0]);
-      console.log('Parsed response:', parsedResponse);
+      console.log('Parsed response successfully');
       
+      // 验证必要字段
       if (!parsedResponse.category || 
           !parsedResponse.severity || 
-          !parsedResponse.puaTechniques ||
           !parsedResponse.analysis ||
-          !parsedResponse.responses ||
-          !parsedResponse.responses.mild ||
-          !parsedResponse.responses.firm ||
-          !parsedResponse.responses.analytical) {
+          !parsedResponse.responses) {
         throw new Error('响应格式不完整');
       }
       
+      // 确保数据格式正确
       const validCategories = ['workplace', 'relationship', 'family', 'general'];
       if (!validCategories.includes(parsedResponse.category)) {
         parsedResponse.category = 'general';
       }
       
       parsedResponse.severity = Math.min(Math.max(1, Number(parsedResponse.severity)), 10);
+      parsedResponse.puaTechniques = parsedResponse.puaTechniques || [];
+      
+      // 确保 responses 对象完整
+      if (!parsedResponse.responses.mild) parsedResponse.responses.mild = "我需要时间考虑这个问题。";
+      if (!parsedResponse.responses.firm) parsedResponse.responses.firm = "我不同意这种说法。";
+      if (!parsedResponse.responses.analytical) parsedResponse.responses.analytical = "让我们理性地讨论这个问题。";
       
       console.log('Returning successful response');
       return NextResponse.json(parsedResponse);
     } catch (e) {
-      console.error('解析API响应失败:', e, '原始响应:', response);
+      console.error('解析API响应失败:', e, '原始响应前100字符:', response?.substring(0, 100));
       return NextResponse.json({
         category: 'general',
         severity: 5,
-        puaTechniques: [],
-        analysis: "无法分析此话语的PUA程度",
+        puaTechniques: ['解析失败'],
+        analysis: "AI分析完成，但响应格式解析失败",
         responses: {
           mild: "我理解你的想法，但我需要一些时间考虑。",
           firm: "这个问题我们需要好好讨论，但不是用这种方式。",
@@ -141,12 +141,28 @@ export async function POST(request: Request) {
         }
       });
     }
-  } catch (error) {
-    console.error('调用API失败:', error);
+  } catch (error: any) {
+    console.error('调用API失败:', error.message);
+    
+    // 根据错误类型返回不同的消息
+    if (error.message && error.message.includes('timeout')) {
+      return NextResponse.json({
+        category: 'general',
+        severity: 5,
+        puaTechniques: ['超时'],
+        analysis: "AI分析超时，请稍后重试",
+        responses: {
+          mild: "抱歉，分析需要更多时间，请稍后重试。",
+          firm: "系统繁忙，请稍后再试。",
+          analytical: "当前网络较慢，建议稍后重新分析。"
+        }
+      });
+    }
+    
     return NextResponse.json({
       category: 'general',
       severity: 5,
-      puaTechniques: [],
+      puaTechniques: ['API错误'],
       analysis: "API 服务暂时不可用",
       responses: {
         mild: "抱歉，我现在需要一些时间思考。",
