@@ -50,24 +50,19 @@ export async function POST(request: Request) {
     const openai = createOpenAIClient();
     console.log('OpenAI client created successfully');
     
-    // 第二阶段：基于分析结果生成精准回应
-    const prompt = `基于以下PUA分析结果，生成三种不同风格的回应建议：
+    // 第二阶段：快速生成回应
+    const prompt = `针对PUA话语生成3种回应：
 
 原文：${text}
-分析结果：
-- 类别：${analysisData.category}
-- 严重程度：${analysisData.severity}/10
-- PUA技巧：${analysisData.puaTechniques.join(', ')}
-- 分析：${analysisData.analysis}
+PUA程度：${analysisData.severity}/10
+技巧：${analysisData.puaTechniques.join(', ')}
 
-请生成三种回应风格，每种回应要具体、实用、有针对性：
-
-返回JSON格式：
+JSON格式，每个回应40-60字：
 {
   "responses": {
-    "mild": "温和但坚定的回应，保持关系和谐的同时设立界限，50-80字",
-    "firm": "明确直接的回应，坚定拒绝操控并表达自己立场，50-80字", 
-    "analytical": "理性分析的回应，指出问题所在并提供建设性解决方案，50-80字"
+    "mild": "温和回应",
+    "firm": "坚定回应", 
+    "analytical": "理性回应"
   }
 }`;
 
@@ -80,14 +75,14 @@ export async function POST(request: Request) {
         content: prompt
       }],
       model: "deepseek-chat",
-      temperature: 0.4, // 适度创造性，生成多样化回应
-      max_tokens: 500, // 足够生成三种回应
-      top_p: 0.9,
+      temperature: 0.3, // 适度创造性
+      max_tokens: 300, // 减少token
+      top_p: 0.7, // 平衡质量和速度
       stream: false,
     });
 
     const timeoutPromise = new Promise((_, reject) => {
-      setTimeout(() => reject(new Error('API call timeout')), 8000); // 8秒超时
+      setTimeout(() => reject(new Error('API call timeout')), 6000); // 6秒超时
     });
 
     const completion = await Promise.race([apiCall, timeoutPromise]) as any;

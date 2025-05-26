@@ -51,17 +51,15 @@ export async function POST(request: Request) {
     const openai = createOpenAIClient();
     console.log('OpenAI client created successfully');
     
-    // 第一阶段：快速分析和判断
-    const prompt = `作为反PUA专家，快速分析这句话：${text}
+    // 第一阶段：极简快速分析
+    const prompt = `分析这句话的PUA程度：${text}
 
-只需要基础判断，不要生成回应建议。
-
-返回JSON格式：
+简短回答，JSON格式：
 {
   "category": "workplace|relationship|family|general",
   "severity": 1-10,
-  "puaTechniques": ["具体的PUA技巧名称"],
-  "analysis": "详细分析这句话的操控性质和心理机制，100-150字"
+  "puaTechniques": ["技巧名称"],
+  "analysis": "简要分析，80字以内"
 }`;
 
     console.log('Calling DeepSeek API with timeout...');
@@ -73,14 +71,14 @@ export async function POST(request: Request) {
         content: prompt
       }],
       model: "deepseek-chat",
-      temperature: 0.2, // 降低温度，专注于准确分析
-      max_tokens: 400, // 减少token，只需要分析不需要回应
-      top_p: 0.9, // 保持较好的分析质量
+      temperature: 0.1, // 极低温度，快速准确
+      max_tokens: 200, // 大幅减少token
+      top_p: 0.5, // 减少采样范围
       stream: false,
     });
 
     const timeoutPromise = new Promise((_, reject) => {
-      setTimeout(() => reject(new Error('API call timeout')), 8000); // 8秒超时
+      setTimeout(() => reject(new Error('API call timeout')), 5000); // 5秒超时
     });
 
     const completion = await Promise.race([apiCall, timeoutPromise]) as any;
