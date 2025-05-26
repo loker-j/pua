@@ -7,19 +7,23 @@ import {
   PUAResponse, 
   ResponseStyle 
 } from "@/types/pua";
-import { analyzePUAText as aiAnalyze } from "@/lib/deepseek";
+import { analyzePUAText as aiAnalyze, generateResponses } from "@/lib/deepseek";
 
 export function usePUAAnalysis() {
   const [analysis, setAnalysis] = useState<PUAAnalysis | null>(null);
   const [responses, setResponses] = useState<PUAResponse[]>([]);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [isGeneratingResponses, setIsGeneratingResponses] = useState(false);
 
   const analyzePUAText = async (text: string) => {
     if (!text.trim()) return;
     
     setIsAnalyzing(true);
+    setResponses([]); // 清空之前的回应
     
     try {
+      // 第一阶段：快速分析
+      console.log('开始第一阶段：分析文本...');
       const aiResult = await aiAnalyze(text);
       
       const result: PUAAnalysis = {
@@ -33,6 +37,13 @@ export function usePUAAnalysis() {
       };
       
       setAnalysis(result);
+      setIsAnalyzing(false);
+      
+      // 第二阶段：生成回应建议
+      console.log('开始第二阶段：生成回应建议...');
+      setIsGeneratingResponses(true);
+      
+      const responsesResult = await generateResponses(text, aiResult);
       
       // 根据PUA严重程度调整回应说明
       const getSeverityDescription = (severity: number) => {
@@ -44,19 +55,19 @@ export function usePUAAnalysis() {
       // 转换AI的回应为前端需要的格式
       const generatedResponses: PUAResponse[] = [
         {
-          text: aiResult.responses.mild,
+          text: responsesResult.responses.mild,
           style: "mild",
           explanation: "温和但坚定地表达自己的立场",
           scenario: aiResult.severity <= 3 ? "适合轻度PUA，保持关系和谐的同时设立界限" : "当你想保持关系友好，同时需要表达自己感受的时候"
         },
         {
-          text: aiResult.responses.firm,
+          text: responsesResult.responses.firm,
           style: "firm",
           explanation: "明确且直接地设立界限",
           scenario: aiResult.severity <= 7 ? "适合中度PUA，坚定地拒绝操控" : "当你需要明确表达界限，但仍愿意保持建设性对话时"
         },
         {
-          text: aiResult.responses.analytical,
+          text: responsesResult.responses.analytical,
           style: "analytical",
           explanation: "理性分析并强硬反击",
           scenario: aiResult.severity >= 8 ? "适合重度PUA，强硬反击保护心理健康" : "适合在需要理性讨论问题时使用"
@@ -64,18 +75,21 @@ export function usePUAAnalysis() {
       ];
       
       setResponses(generatedResponses);
+      console.log('两阶段分析完成！');
     } catch (error) {
-      console.error('回应生成失败:', error);
+      console.error('分析失败:', error);
       setResponses([]);
     } finally {
       setIsAnalyzing(false);
+      setIsGeneratingResponses(false);
     }
   };
 
   return {
     analysis,
     responses,
-    isAnalyzing,
+    isAnalyzing: isAnalyzing || isGeneratingResponses, // 任一阶段进行中都显示加载状态
+    isGeneratingResponses,
     analyzePUAText
   };
 }

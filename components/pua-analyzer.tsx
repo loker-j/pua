@@ -20,7 +20,7 @@ interface PUAAnalyzerProps {
 export function PUAAnalyzer({ userPreferences }: PUAAnalyzerProps) {
   const [input, setInput] = useState("");
   const [records, setRecords] = useLocalStorage<PUARecord[]>("puaRecords", []);
-  const { analysis, responses, isAnalyzing, analyzePUAText } = usePUAAnalysis();
+  const { analysis, responses, isAnalyzing, isGeneratingResponses, analyzePUAText } = usePUAAnalysis();
   const [selectedResponse, setSelectedResponse] = useState<PUAResponse | null>(null);
 
   const handleAnalyze = () => {
@@ -237,7 +237,7 @@ export function PUAAnalyzer({ userPreferences }: PUAAnalyzerProps) {
       </div>
 
       {/* Response Options */}
-      {responses.length > 0 && (
+      {(responses.length > 0 || isGeneratingResponses) && (
         <div className="space-y-4">
           <h2 className="text-xl font-bold">
             {userPreferences.language === "zh" ? "建议回应" : "Suggested Responses"}
@@ -247,17 +247,29 @@ export function PUAAnalyzer({ userPreferences }: PUAAnalyzerProps) {
               ? "选择适合您情况的回应方式。每个选项提供不同的处理方法。"
               : "Select a response style that fits your situation. Each option offers a different approach."}
           </p>
-          <div className="grid gap-4 md:grid-cols-3">
-            {responses.map((response, index) => (
-              <ResponseCard 
-                key={index}
-                response={response}
-                isSelected={selectedResponse?.text === response.text}
-                onSelect={() => handleSelectResponse(response)}
-                language={userPreferences.language}
-              />
-            ))}
-          </div>
+          
+          {isGeneratingResponses ? (
+            <div className="flex flex-col items-center justify-center min-h-[200px]">
+              <Loader2 className="h-8 w-8 animate-spin text-primary mb-2" />
+              <p className="text-muted-foreground">
+                {userPreferences.language === "zh" 
+                  ? "正在生成回应建议..."
+                  : "Generating response suggestions..."}
+              </p>
+            </div>
+          ) : (
+            <div className="grid gap-4 md:grid-cols-3">
+              {responses.map((response, index) => (
+                <ResponseCard 
+                  key={index}
+                  response={response}
+                  isSelected={selectedResponse?.text === response.text}
+                  onSelect={() => handleSelectResponse(response)}
+                  language={userPreferences.language}
+                />
+              ))}
+            </div>
+          )}
         </div>
       )}
 
