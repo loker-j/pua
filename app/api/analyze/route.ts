@@ -19,6 +19,12 @@ export async function POST(request: Request) {
   try {
     // 检查是否有 API key
     const apiKey = process.env.DEEPSEEK_API_KEY || process.env.OPENAI_API_KEY;
+    console.log('API Key check:', {
+      hasDeepseekKey: !!process.env.DEEPSEEK_API_KEY,
+      hasOpenaiKey: !!process.env.OPENAI_API_KEY,
+      keyPrefix: apiKey ? apiKey.substring(0, 8) + '...' : 'not found'
+    });
+    
     if (!apiKey) {
       console.warn('API key not configured, returning fallback response');
       return NextResponse.json({
@@ -35,9 +41,11 @@ export async function POST(request: Request) {
     }
 
     const { text } = await request.json();
+    console.log('Analyzing text:', text);
     
     // 在这里初始化 OpenAI 客户端
     const openai = createOpenAIClient();
+    console.log('OpenAI client created successfully');
     
     const prompt = `你是一个专业的心理学专家和反PUA顾问。请分析以下话语的PUA程度，并生成相应的反PUA回复。
 
@@ -69,6 +77,7 @@ export async function POST(request: Request) {
   }
 }`;
 
+    console.log('Calling DeepSeek API...');
     const completion = await openai.chat.completions.create({
       messages: [{ 
         role: "system", 
@@ -81,7 +90,9 @@ export async function POST(request: Request) {
       temperature: 0.7,
     });
 
+    console.log('API call successful, processing response...');
     const response = completion.choices[0].message.content;
+    console.log('Raw API response:', response);
     
     try {
       if (!response) {
@@ -94,6 +105,7 @@ export async function POST(request: Request) {
       }
       
       const parsedResponse = JSON.parse(jsonMatch[0]);
+      console.log('Parsed response:', parsedResponse);
       
       if (!parsedResponse.category || 
           !parsedResponse.severity || 
@@ -113,6 +125,7 @@ export async function POST(request: Request) {
       
       parsedResponse.severity = Math.min(Math.max(1, Number(parsedResponse.severity)), 10);
       
+      console.log('Returning successful response');
       return NextResponse.json(parsedResponse);
     } catch (e) {
       console.error('解析API响应失败:', e, '原始响应:', response);
@@ -120,7 +133,7 @@ export async function POST(request: Request) {
         category: 'general',
         severity: 5,
         puaTechniques: [],
-        analysis: "无法分析",
+        analysis: "无法分析此话语的PUA程度",
         responses: {
           mild: "我理解你的想法，但我需要一些时间考虑。",
           firm: "这个问题我们需要好好讨论，但不是用这种方式。",
