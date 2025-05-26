@@ -11,18 +11,21 @@ import { Footer } from "@/components/footer";
 import { useLocalStorage } from "@/hooks/use-local-storage";
 import { UserPreferences, defaultUserPreferences } from "@/types/user";
 
-// 动态导入训练模式组件，禁用SSR
-const TrainingMode = dynamic(() => import("@/components/training-mode").then(mod => ({ default: mod.TrainingMode })), {
-  ssr: false,
-  loading: () => (
-    <div className="flex items-center justify-center min-h-[400px]">
-      <div className="text-center">
-        <h3 className="text-lg font-medium mb-2">加载中...</h3>
-        <p className="text-muted-foreground">正在初始化训练模式</p>
+// 使用更简单的动态导入语法
+const TrainingMode = dynamic(
+  () => import("@/components/training-mode").then((mod) => ({ default: mod.TrainingMode })),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <div className="text-center">
+          <h3 className="text-lg font-medium mb-2">加载中...</h3>
+          <p className="text-muted-foreground">正在初始化训练模式</p>
+        </div>
       </div>
-    </div>
-  )
-});
+    ),
+  }
+);
 
 export function Home() {
   const [userPreferences, setUserPreferences] = useLocalStorage<UserPreferences>(
