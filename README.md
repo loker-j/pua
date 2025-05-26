@@ -20,6 +20,39 @@
 - **状态管理**: React Hooks + Local Storage
 - **部署**: Netlify
 
+## 环境变量配置
+
+项目需要配置 API key 来使用 PUA 分析功能：
+
+```bash
+# 使用 DeepSeek API（推荐）
+DEEPSEEK_API_KEY=your_deepseek_api_key_here
+
+# 或者使用 OpenAI API
+OPENAI_API_KEY=your_openai_api_key_here
+```
+
+### 获取 API Key
+
+1. **DeepSeek API**（推荐）:
+   - 访问 [DeepSeek 官网](https://platform.deepseek.com/)
+   - 注册账号并获取 API key
+   - 成本更低，性能优秀
+
+2. **OpenAI API**:
+   - 访问 [OpenAI 平台](https://platform.openai.com/)
+   - 注册账号并获取 API key
+
+### Netlify 部署配置
+
+在 Netlify 部署时，需要在环境变量设置中添加：
+
+1. 进入 Netlify 项目设置
+2. 找到 "Environment variables" 部分
+3. 添加 `DEEPSEEK_API_KEY` 或 `OPENAI_API_KEY`
+
+**注意**: 如果没有配置 API key，PUA 分析器将返回默认的回退响应，其他功能仍可正常使用。
+
 ## 项目结构
 
 ```

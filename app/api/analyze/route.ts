@@ -1,14 +1,43 @@
 import { NextResponse } from 'next/server';
 import OpenAI from "openai";
 
-const openai = new OpenAI({
-  baseURL: 'https://api.deepseek.com',
-  apiKey: process.env.DEEPSEEK_API_KEY
-});
+// 在函数内部初始化 OpenAI 客户端，而不是模块级别
+function createOpenAIClient() {
+  const apiKey = process.env.DEEPSEEK_API_KEY || process.env.OPENAI_API_KEY;
+  
+  if (!apiKey) {
+    throw new Error('API key not found. Please set DEEPSEEK_API_KEY or OPENAI_API_KEY environment variable.');
+  }
+  
+  return new OpenAI({
+    baseURL: 'https://api.deepseek.com',
+    apiKey: apiKey
+  });
+}
 
 export async function POST(request: Request) {
   try {
+    // 检查是否有 API key
+    const apiKey = process.env.DEEPSEEK_API_KEY || process.env.OPENAI_API_KEY;
+    if (!apiKey) {
+      console.warn('API key not configured, returning fallback response');
+      return NextResponse.json({
+        category: 'general',
+        severity: 5,
+        puaTechniques: ['无法分析'],
+        analysis: "API 服务暂时不可用，请稍后再试。",
+        responses: {
+          mild: "我需要一些时间来思考这个问题。",
+          firm: "这个话题我们需要换个时间讨论。",
+          analytical: "让我们先冷静下来，理性地看待这个情况。"
+        }
+      });
+    }
+
     const { text } = await request.json();
+    
+    // 在这里初始化 OpenAI 客户端
+    const openai = createOpenAIClient();
     
     const prompt = `你是一个专业的心理学专家和反PUA顾问。请分析以下话语的PUA程度，并生成相应的反PUA回复。
 
@@ -105,7 +134,7 @@ export async function POST(request: Request) {
       category: 'general',
       severity: 5,
       puaTechniques: [],
-      analysis: "无法分析",
+      analysis: "API 服务暂时不可用",
       responses: {
         mild: "抱歉，我现在需要一些时间思考。",
         firm: "这个问题我们稍后再讨论。",
