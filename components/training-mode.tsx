@@ -5,44 +5,72 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
-import { AlertCircle, CheckCircle, ChevronRight, Dumbbell, RefreshCw, Lightbulb } from "lucide-react";
+import { AlertCircle, CheckCircle, ChevronRight, Dumbbell, RefreshCw, Lightbulb, BookOpen, PenTool, Trophy, Target } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
 import { useLocalStorage } from "@/hooks/use-local-storage";
-import { TrainingProgress, TrainingScenario } from "@/types/pua";
+import { TrainingProgress, MultipleChoiceScenario, FillInBlankScenario, TrainingMode as TrainingModeType } from "@/types/pua";
 import { UserPreferences } from "@/types/user";
-import { trainingScenarios } from "@/data/training-scenarios";
+import { multipleChoiceScenarios, fillInBlankScenarios } from "@/data/training-scenarios";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 interface TrainingModeProps {
   userPreferences: UserPreferences;
 }
 
+interface MultipleChoiceFeedback {
+  selectedOptionId: string;
+  score: number;
+  explanation: string;
+  isCorrect: boolean;
+}
+
+interface FillInBlankFeedback {
+  score: number;
+  strengths: string[];
+  improvements: string[];
+  suggestions: string;
+  comparison: string;
+}
+
 export function TrainingMode({ userPreferences }: TrainingModeProps) {
   const [isClient, setIsClient] = useState(false);
-  const [progress, setProgress] = useLocalStorage<TrainingProgress>("trainingProgress", {
+  const [isMounted, setIsMounted] = useState(false);
+  
+  const [progress, setProgress, isProgressInitialized] = useLocalStorage<TrainingProgress>("trainingProgress", {
     completedScenarios: [],
     totalScore: 0,
     lastTrainingDate: 0,
-    weakAreas: []
+    weakAreas: [],
+    multipleChoiceStats: {
+      totalAttempts: 0,
+      correctAnswers: 0,
+      averageScore: 0
+    },
+    fillInBlankStats: {
+      totalAttempts: 0,
+      averageScore: 0,
+      improvementTrend: []
+    }
   });
   
-  const [currentScenario, setCurrentScenario] = useState<TrainingScenario | null>(null);
+  const [currentMode, setCurrentMode] = useState<TrainingModeType>("multiple-choice");
+  const [currentMCScenario, setCurrentMCScenario] = useState<MultipleChoiceScenario | null>(null);
+  const [currentFIBScenario, setCurrentFIBScenario] = useState<FillInBlankScenario | null>(null);
   const [userResponse, setUserResponse] = useState("");
-  const [feedback, setFeedback] = useState<{
-    score: number;
-    strengths: string[];
-    improvements: string[];
-    suggestions: string;
-  } | null>(null);
+  const [mcFeedback, setMCFeedback] = useState<MultipleChoiceFeedback | null>(null);
+  const [fibFeedback, setFIBFeedback] = useState<FillInBlankFeedback | null>(null);
   const [isCompleted, setIsCompleted] = useState(false);
+  const [isEvaluating, setIsEvaluating] = useState(false);
 
   useEffect(() => {
     setIsClient(true);
+    setIsMounted(true);
   }, []);
 
-  const startTraining = (difficulty: "easy" | "medium" | "hard") => {
-    if (!isClient) return;
+  const startMultipleChoiceTraining = (difficulty: "easy" | "medium" | "hard") => {
+    if (!isClient || !isMounted || !isProgressInitialized) return;
     
-    const availableScenarios = trainingScenarios.filter(
+    const availableScenarios = multipleChoiceScenarios.filter(
       scenario => 
         scenario.difficulty === difficulty && 
         !progress.completedScenarios.includes(scenario.id)
@@ -50,128 +78,150 @@ export function TrainingMode({ userPreferences }: TrainingModeProps) {
     
     const scenariosToChooseFrom = availableScenarios.length > 0 
       ? availableScenarios 
-      : trainingScenarios.filter(scenario => scenario.difficulty === difficulty);
+      : multipleChoiceScenarios.filter(scenario => scenario.difficulty === difficulty);
     
     const randomScenario = scenariosToChooseFrom[
       Math.floor(Math.random() * scenariosToChooseFrom.length)
     ];
     
-    setCurrentScenario(randomScenario);
+    setCurrentMCScenario(randomScenario);
+    setCurrentFIBScenario(null);
     setUserResponse("");
-    setFeedback(null);
+    setMCFeedback(null);
+    setFIBFeedback(null);
     setIsCompleted(false);
   };
 
-  const analyzeResponse = () => {
-    if (!currentScenario || !userResponse.trim() || !isClient) return;
+  const startFillInBlankTraining = (difficulty: "easy" | "medium" | "hard") => {
+    if (!isClient || !isMounted || !isProgressInitialized) return;
     
-    const response = userResponse.toLowerCase();
-    const points = currentScenario.idealResponsePoints;
+    const availableScenarios = fillInBlankScenarios.filter(
+      scenario => 
+        scenario.difficulty === difficulty && 
+        !progress.completedScenarios.includes(scenario.id)
+    );
     
-    let score = 0;
-    const strengths: string[] = [];
-    const improvements: string[] = [];
+    const scenariosToChooseFrom = availableScenarios.length > 0 
+      ? availableScenarios 
+      : fillInBlankScenarios.filter(scenario => scenario.difficulty === difficulty);
     
-    if (response.includes("界限") || response.includes("boundary") || 
-        response.includes("limit") || response.includes("不舒服")) {
-      score += 2;
-      strengths.push(userPreferences.language === "zh" 
-        ? "你很好地设立了清晰的界限"
-        : "You established clear boundaries");
-    } else {
-      improvements.push(userPreferences.language === "zh"
-        ? "考虑明确表达你的界限"
-        : "Consider clearly stating your boundaries");
-    }
+    const randomScenario = scenariosToChooseFrom[
+      Math.floor(Math.random() * scenariosToChooseFrom.length)
+    ];
     
-    if (response.includes("我感觉") || response.includes("我是") || 
-        response.includes("我需要") || response.includes("我会")) {
-      score += 2;
-      strengths.push(userPreferences.language === "zh"
-        ? "你有效地使用了\"我\"的陈述"
-        : "You used 'I' statements effectively");
-    } else {
-      improvements.push(userPreferences.language === "zh"
-        ? "尝试使用更多\"我\"的陈述来表达你的观点"
-        : "Try using more 'I' statements to express your perspective");
-    }
+    setCurrentFIBScenario(randomScenario);
+    setCurrentMCScenario(null);
+    setUserResponse("");
+    setMCFeedback(null);
+    setFIBFeedback(null);
+    setIsCompleted(false);
+  };
+
+  const handleMultipleChoiceAnswer = (optionId: string) => {
+    if (!currentMCScenario || isCompleted) return;
     
-    if (response.includes("操控") || response.includes("不公平") ||
-        response.includes("不能接受") || response.includes("不恰当")) {
-      score += 2;
-      strengths.push(userPreferences.language === "zh"
-        ? "你直接指出了操控行为"
-        : "You directly addressed the manipulative behavior");
-    }
+    const selectedOption = currentMCScenario.options.find(opt => opt.id === optionId);
+    if (!selectedOption) return;
     
-    if (response.includes("闭嘴") || response.includes("恨你") ||
-        response.includes("蠢") || response.includes("白痴")) {
-      score -= 2;
-      improvements.push(userPreferences.language === "zh"
-        ? "避免使用可能激化情况的攻击性语言"
-        : "Avoid aggressive language that can escalate the situation");
-    }
+    const feedback: MultipleChoiceFeedback = {
+      selectedOptionId: optionId,
+      score: selectedOption.score,
+      explanation: selectedOption.explanation,
+      isCorrect: selectedOption.isCorrect
+    };
     
-    if (response.includes("事实") || response.includes("实际上") ||
-        response.includes("现实") || response.includes("真相")) {
-      score += 1;
-      strengths.push(userPreferences.language === "zh"
-        ? "你在回应中包含了事实陈述"
-        : "You included factual statements in your response");
-    }
+    setMCFeedback(feedback);
+    setIsCompleted(true);
     
-    const finalScore = Math.min(Math.max(score, 1), 10);
-    
-    let suggestions = "";
-    if (finalScore <= 3) {
-      suggestions = userPreferences.language === "zh"
-        ? "你的回应可以通过设立更清晰的界限和更直接地指出操控行为来改进。尝试使用\"我\"的陈述，关注具体行为而不是人。"
-        : "Your response could benefit from clearer boundaries and more direct addressing of the manipulative behavior. Try using 'I' statements and focus on the specific behavior rather than the person.";
-    } else if (finalScore <= 6) {
-      suggestions = userPreferences.language === "zh"
-        ? "你的回应有一些很好的元素，但还可以更有效。考虑在保持冷静语气的同时更直接地指出操控。"
-        : "Your response has some strong elements, but could be more effective. Consider being more direct about the manipulation while maintaining a calm tone.";
-    } else {
-      suggestions = userPreferences.language === "zh"
-        ? "你的回应很好地应对了操控。继续在类似情况下使用清晰的界限和\"我\"的陈述。"
-        : "Your response is effective at addressing the manipulation. Keep using clear boundaries and 'I' statements in similar situations.";
-    }
-    
-    if (strengths.length === 0) {
-      strengths.push(userPreferences.language === "zh"
-        ? "你尝试了应对这个情况"
-        : "You attempted to address the situation");
-    }
-    
-    setFeedback({
-      score: finalScore,
-      strengths,
-      improvements,
-      suggestions
-    });
-    
-    if (!progress.completedScenarios.includes(currentScenario.id)) {
+    // 更新进度
+    if (!progress.completedScenarios.includes(currentMCScenario.id)) {
       const newProgress = {
         ...progress,
-        completedScenarios: [...progress.completedScenarios, currentScenario.id],
-        totalScore: progress.totalScore + finalScore,
-        lastTrainingDate: Date.now()
+        completedScenarios: [...progress.completedScenarios, currentMCScenario.id],
+        totalScore: progress.totalScore + selectedOption.score,
+        lastTrainingDate: Date.now(),
+        multipleChoiceStats: {
+          totalAttempts: progress.multipleChoiceStats.totalAttempts + 1,
+          correctAnswers: progress.multipleChoiceStats.correctAnswers + (selectedOption.isCorrect ? 1 : 0),
+          averageScore: ((progress.multipleChoiceStats.averageScore * progress.multipleChoiceStats.totalAttempts) + selectedOption.score) / (progress.multipleChoiceStats.totalAttempts + 1)
+        },
+        fillInBlankStats: progress.fillInBlankStats
       };
       setProgress(newProgress);
     }
+  };
+
+  const handleFillInBlankSubmit = async () => {
+    if (!currentFIBScenario || !userResponse.trim() || isEvaluating) return;
     
-    setIsCompleted(true);
+    setIsEvaluating(true);
+    
+    try {
+      const response = await fetch("/api/training/evaluate", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          userAnswer: userResponse,
+          standardAnswer: currentFIBScenario.standardAnswer,
+          idealResponsePoints: currentFIBScenario.idealResponsePoints,
+          puaText: currentFIBScenario.puaText,
+          category: currentFIBScenario.category,
+          language: userPreferences.language
+        }),
+      });
+      
+      if (!response.ok) {
+        throw new Error("Evaluation failed");
+      }
+      
+      const evaluation = await response.json();
+      setFIBFeedback(evaluation);
+      setIsCompleted(true);
+      
+      // 更新进度
+      if (!progress.completedScenarios.includes(currentFIBScenario.id)) {
+        const newTrend = [...progress.fillInBlankStats.improvementTrend, evaluation.score].slice(-10);
+        const newProgress = {
+          ...progress,
+          completedScenarios: [...progress.completedScenarios, currentFIBScenario.id],
+          totalScore: progress.totalScore + evaluation.score,
+          lastTrainingDate: Date.now(),
+          multipleChoiceStats: progress.multipleChoiceStats,
+          fillInBlankStats: {
+            totalAttempts: progress.fillInBlankStats.totalAttempts + 1,
+            averageScore: ((progress.fillInBlankStats.averageScore * progress.fillInBlankStats.totalAttempts) + evaluation.score) / (progress.fillInBlankStats.totalAttempts + 1),
+            improvementTrend: newTrend
+          }
+        };
+        setProgress(newProgress);
+      }
+    } catch (error) {
+      console.error("Evaluation error:", error);
+      // 使用备用评估
+      const fallbackFeedback: FillInBlankFeedback = {
+        score: 5,
+        strengths: [userPreferences.language === "zh" ? "你尝试了应对这个情况" : "You attempted to address the situation"],
+        improvements: [userPreferences.language === "zh" ? "可以更明确地设立界限" : "Could establish clearer boundaries"],
+        suggestions: userPreferences.language === "zh" ? "继续练习，注意使用'我'的陈述。" : "Keep practicing and focus on using 'I' statements.",
+        comparison: userPreferences.language === "zh" ? "评估暂时不可用，请稍后再试。" : "Evaluation temporarily unavailable, please try again later."
+      };
+      setFIBFeedback(fallbackFeedback);
+      setIsCompleted(true);
+    } finally {
+      setIsEvaluating(false);
+    }
   };
 
   const resetTraining = () => {
-    setCurrentScenario(null);
+    setCurrentMCScenario(null);
+    setCurrentFIBScenario(null);
     setUserResponse("");
-    setFeedback(null);
+    setMCFeedback(null);
+    setFIBFeedback(null);
     setIsCompleted(false);
   };
-
-  const completionPercentage = 
-    Math.round((progress.completedScenarios.length / trainingScenarios.length) * 100);
 
   const getDifficultyLabel = (difficulty: string) => {
     if (userPreferences.language === "zh") {
@@ -186,20 +236,30 @@ export function TrainingMode({ userPreferences }: TrainingModeProps) {
            difficulty === "medium" ? "Intermediate" : "Advanced";
   };
 
+  const completionPercentage = isMounted && (multipleChoiceScenarios.length + fillInBlankScenarios.length) > 0
+    ? Math.round((progress.completedScenarios.length / (multipleChoiceScenarios.length + fillInBlankScenarios.length)) * 100)
+    : 0;
+
+  if (!isMounted) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <div className="text-center">
+          <h3 className="text-lg font-medium mb-2">
+            {userPreferences.language === "zh" ? "加载中..." : "Loading..."}
+          </h3>
+          <p className="text-muted-foreground">
+            {userPreferences.language === "zh" ? "正在初始化训练模式" : "Initializing training mode"}
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  const currentScenario = currentMCScenario || currentFIBScenario;
+
   return (
     <div className="space-y-6 animate-in fade-in duration-500">
-      {!isClient ? (
-        <div className="flex items-center justify-center min-h-[400px]">
-          <div className="text-center">
-            <h3 className="text-lg font-medium mb-2">
-              {userPreferences.language === "zh" ? "加载中..." : "Loading..."}
-            </h3>
-            <p className="text-muted-foreground">
-              {userPreferences.language === "zh" ? "正在初始化训练模式" : "Initializing training mode"}
-            </p>
-          </div>
-        </div>
-      ) : !currentScenario ? (
+      {!currentScenario ? (
         <>
           <div className="flex flex-col md:flex-row gap-4 md:items-center md:justify-between">
             <div>
@@ -208,8 +268,8 @@ export function TrainingMode({ userPreferences }: TrainingModeProps) {
               </h2>
               <p className="text-muted-foreground mt-1">
                 {userPreferences.language === "zh"
-                  ? "在安全的场景中练习应对操控性语言"
-                  : "Practice responding to manipulative language in safe scenarios"}
+                  ? "选择训练类型，在安全的场景中练习应对操控性语言"
+                  : "Choose training type and practice responding to manipulative language in safe scenarios"}
               </p>
             </div>
           </div>
@@ -218,7 +278,8 @@ export function TrainingMode({ userPreferences }: TrainingModeProps) {
             {/* Progress Card */}
             <Card>
               <CardHeader>
-                <CardTitle>
+                <CardTitle className="flex items-center gap-2">
+                  <Trophy className="h-5 w-5 text-amber-500" />
                   {userPreferences.language === "zh" ? "你的进度" : "Your Progress"}
                 </CardTitle>
                 <CardDescription>
@@ -231,7 +292,7 @@ export function TrainingMode({ userPreferences }: TrainingModeProps) {
                 <div className="space-y-2">
                   <div className="flex justify-between text-sm">
                     <span>
-                      {userPreferences.language === "zh" ? "完成度" : "Completion"}
+                      {userPreferences.language === "zh" ? "总完成度" : "Overall Completion"}
                     </span>
                     <span className="font-medium">{completionPercentage}%</span>
                   </div>
@@ -257,6 +318,29 @@ export function TrainingMode({ userPreferences }: TrainingModeProps) {
                     </p>
                   </div>
                 </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="bg-blue-50 dark:bg-blue-950 p-3 rounded-lg">
+                    <p className="text-sm text-blue-600 dark:text-blue-400">
+                      {userPreferences.language === "zh" ? "选择题正确率" : "Multiple Choice Accuracy"}
+                    </p>
+                    <p className="text-lg font-bold text-blue-700 dark:text-blue-300">
+                      {progress.multipleChoiceStats.totalAttempts > 0
+                        ? Math.round((progress.multipleChoiceStats.correctAnswers / progress.multipleChoiceStats.totalAttempts) * 100)
+                        : 0}%
+                    </p>
+                  </div>
+                  <div className="bg-green-50 dark:bg-green-950 p-3 rounded-lg">
+                    <p className="text-sm text-green-600 dark:text-green-400">
+                      {userPreferences.language === "zh" ? "填空题平均分" : "Fill-in-Blank Average"}
+                    </p>
+                    <p className="text-lg font-bold text-green-700 dark:text-green-300">
+                      {progress.fillInBlankStats.totalAttempts > 0
+                        ? Math.round(progress.fillInBlankStats.averageScore)
+                        : 0}/10
+                    </p>
+                  </div>
+                </div>
                 
                 {progress.lastTrainingDate > 0 && (
                   <div className="text-sm text-muted-foreground">
@@ -267,89 +351,102 @@ export function TrainingMode({ userPreferences }: TrainingModeProps) {
               </CardContent>
             </Card>
             
-            {/* Difficulty Selection */}
+            {/* Training Mode Selection */}
             <Card>
               <CardHeader>
-                <CardTitle>
-                  {userPreferences.language === "zh" ? "开始训练" : "Start Training"}
+                <CardTitle className="flex items-center gap-2">
+                  <Target className="h-5 w-5 text-blue-500" />
+                  {userPreferences.language === "zh" ? "选择训练模式" : "Choose Training Mode"}
                 </CardTitle>
                 <CardDescription>
                   {userPreferences.language === "zh"
-                    ? "选择难度等级开始"
-                    : "Choose a difficulty level to begin"}
+                    ? "选择训练类型和难度等级"
+                    : "Select training type and difficulty level"}
                 </CardDescription>
               </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="grid grid-cols-1 gap-3">
-                  <Button 
-                    onClick={() => startTraining("easy")}
-                    className="justify-start h-auto py-3"
-                    variant="outline"
-                  >
-                    <div className="flex items-center">
-                      <div className="bg-green-100 dark:bg-green-900 p-2 rounded-full mr-3">
-                        <Dumbbell className="h-5 w-5 text-green-600 dark:text-green-400" />
-                      </div>
-                      <div className="text-left">
-                        <h3 className="font-medium">
-                          {userPreferences.language === "zh" ? "初级难度" : "Beginner Level"}
-                        </h3>
-                        <p className="text-sm text-muted-foreground">
-                          {userPreferences.language === "zh"
-                            ? "基础场景，操控性明显"
-                            : "Basic scenarios with clear manipulation"}
-                        </p>
-                      </div>
-                    </div>
-                    <ChevronRight className="ml-auto h-5 w-5 text-muted-foreground" />
-                  </Button>
+              <CardContent>
+                <Tabs value={currentMode} onValueChange={(value) => setCurrentMode(value as TrainingModeType)}>
+                  <TabsList className="grid w-full grid-cols-2">
+                    <TabsTrigger value="multiple-choice" className="flex items-center gap-2">
+                      <BookOpen className="h-4 w-4" />
+                      {userPreferences.language === "zh" ? "选择题" : "Multiple Choice"}
+                    </TabsTrigger>
+                    <TabsTrigger value="fill-in-blank" className="flex items-center gap-2">
+                      <PenTool className="h-4 w-4" />
+                      {userPreferences.language === "zh" ? "填空题" : "Fill-in-Blank"}
+                    </TabsTrigger>
+                  </TabsList>
                   
-                  <Button 
-                    onClick={() => startTraining("medium")}
-                    className="justify-start h-auto py-3"
-                    variant="outline"
-                  >
-                    <div className="flex items-center">
-                      <div className="bg-amber-100 dark:bg-amber-900 p-2 rounded-full mr-3">
-                        <Dumbbell className="h-5 w-5 text-amber-600 dark:text-amber-400" />
-                      </div>
-                      <div className="text-left">
-                        <h3 className="font-medium">
-                          {userPreferences.language === "zh" ? "中级难度" : "Intermediate Level"}
-                        </h3>
-                        <p className="text-sm text-muted-foreground">
-                          {userPreferences.language === "zh"
-                            ? "更微妙的操控形式"
-                            : "More subtle forms of manipulation"}
-                        </p>
-                      </div>
+                  <TabsContent value="multiple-choice" className="space-y-3 mt-4">
+                    <p className="text-sm text-muted-foreground">
+                      {userPreferences.language === "zh" 
+                        ? "从预设选项中选择最佳回应，本地评分，即时反馈"
+                        : "Choose the best response from preset options, local scoring, instant feedback"}
+                    </p>
+                    <div className="grid grid-cols-1 gap-2">
+                      {["easy", "medium", "hard"].map((difficulty) => (
+                        <Button 
+                          key={difficulty}
+                          onClick={() => startMultipleChoiceTraining(difficulty as "easy" | "medium" | "hard")}
+                          className="justify-start h-auto py-2"
+                          variant="outline"
+                          size="sm"
+                        >
+                          <div className="flex items-center">
+                            <div className={`p-1.5 rounded-full mr-2 ${
+                              difficulty === "easy" ? "bg-green-100 dark:bg-green-900" :
+                              difficulty === "medium" ? "bg-amber-100 dark:bg-amber-900" :
+                              "bg-red-100 dark:bg-red-900"
+                            }`}>
+                              <Dumbbell className={`h-3 w-3 ${
+                                difficulty === "easy" ? "text-green-600 dark:text-green-400" :
+                                difficulty === "medium" ? "text-amber-600 dark:text-amber-400" :
+                                "text-red-600 dark:text-red-400"
+                              }`} />
+                            </div>
+                            <span className="text-sm">{getDifficultyLabel(difficulty)}</span>
+                          </div>
+                          <ChevronRight className="ml-auto h-4 w-4 text-muted-foreground" />
+                        </Button>
+                      ))}
                     </div>
-                    <ChevronRight className="ml-auto h-5 w-5 text-muted-foreground" />
-                  </Button>
+                  </TabsContent>
                   
-                  <Button 
-                    onClick={() => startTraining("hard")}
-                    className="justify-start h-auto py-3"
-                    variant="outline"
-                  >
-                    <div className="flex items-center">
-                      <div className="bg-red-100 dark:bg-red-900 p-2 rounded-full mr-3">
-                        <Dumbbell className="h-5 w-5 text-red-600 dark:text-red-400" />
-                      </div>
-                      <div className="text-left">
-                        <h3 className="font-medium">
-                          {userPreferences.language === "zh" ? "高级难度" : "Advanced Level"}
-                        </h3>
-                        <p className="text-sm text-muted-foreground">
-                          {userPreferences.language === "zh"
-                            ? "复杂、微妙的场景，需要谨慎应对"
-                            : "Complex, subtle scenarios that are challenging to navigate"}
-                        </p>
-                      </div>
+                  <TabsContent value="fill-in-blank" className="space-y-3 mt-4">
+                    <p className="text-sm text-muted-foreground">
+                      {userPreferences.language === "zh" 
+                        ? "自由回答，AI智能评分，对比标准答案"
+                        : "Free response, AI intelligent scoring, compare with standard answers"}
+                    </p>
+                    <div className="grid grid-cols-1 gap-2">
+                      {["easy", "medium", "hard"].map((difficulty) => (
+                        <Button 
+                          key={difficulty}
+                          onClick={() => startFillInBlankTraining(difficulty as "easy" | "medium" | "hard")}
+                          className="justify-start h-auto py-2"
+                          variant="outline"
+                          size="sm"
+                        >
+                          <div className="flex items-center">
+                            <div className={`p-1.5 rounded-full mr-2 ${
+                              difficulty === "easy" ? "bg-green-100 dark:bg-green-900" :
+                              difficulty === "medium" ? "bg-amber-100 dark:bg-amber-900" :
+                              "bg-red-100 dark:bg-red-900"
+                            }`}>
+                              <Dumbbell className={`h-3 w-3 ${
+                                difficulty === "easy" ? "text-green-600 dark:text-green-400" :
+                                difficulty === "medium" ? "text-amber-600 dark:text-amber-400" :
+                                "text-red-600 dark:text-red-400"
+                              }`} />
+                            </div>
+                            <span className="text-sm">{getDifficultyLabel(difficulty)}</span>
+                          </div>
+                          <ChevronRight className="ml-auto h-4 w-4 text-muted-foreground" />
+                        </Button>
+                      ))}
                     </div>
-                    <ChevronRight className="ml-auto h-5 w-5 text-muted-foreground" />
-                  </Button>
-                </div>
+                  </TabsContent>
+                </Tabs>
               </CardContent>
             </Card>
           </div>
@@ -357,7 +454,8 @@ export function TrainingMode({ userPreferences }: TrainingModeProps) {
       ) : (
         <div className="space-y-6">
           <div className="flex justify-between items-center">
-            <h2 className="text-2xl font-bold">
+            <h2 className="text-2xl font-bold flex items-center gap-2">
+              {currentMCScenario ? <BookOpen className="h-6 w-6 text-blue-500" /> : <PenTool className="h-6 w-6 text-green-500" />}
               {userPreferences.language === "zh" ? "训练场景" : "Training Scenario"}
             </h2>
             <Button variant="outline" size="sm" onClick={resetTraining}>
@@ -373,6 +471,16 @@ export function TrainingMode({ userPreferences }: TrainingModeProps) {
                   <CardTitle>{currentScenario.situation}</CardTitle>
                   <CardDescription className="mt-1">
                     {currentScenario.category} · {getDifficultyLabel(currentScenario.difficulty)}
+                    {currentMCScenario && (
+                      <Badge variant="outline" className="ml-2">
+                        {userPreferences.language === "zh" ? "选择题" : "Multiple Choice"}
+                      </Badge>
+                    )}
+                    {currentFIBScenario && (
+                      <Badge variant="outline" className="ml-2">
+                        {userPreferences.language === "zh" ? "填空题" : "Fill-in-Blank"}
+                      </Badge>
+                    )}
                   </CardDescription>
                 </div>
                 <Badge variant="outline">
@@ -388,50 +496,138 @@ export function TrainingMode({ userPreferences }: TrainingModeProps) {
                 <p className="text-lg italic">"{currentScenario.puaText}"</p>
               </div>
               
-              <div className="space-y-2">
-                <h3 className="font-medium">
-                  {userPreferences.language === "zh" ? "你的回应：" : "Your Response:"}
-                </h3>
-                <Textarea
-                  placeholder={userPreferences.language === "zh"
-                    ? "输入你会如何回应这个陈述..."
-                    : "Type how you would respond to this statement..."}
-                  className="min-h-[120px]"
-                  value={userResponse}
-                  onChange={(e) => setUserResponse(e.target.value)}
-                  disabled={isCompleted}
-                />
-              </div>
+              {currentMCScenario && (
+                <div className="space-y-3">
+                  <h3 className="font-medium">
+                    {currentMCScenario.question}
+                  </h3>
+                  <div className="space-y-2">
+                    {currentMCScenario.options.map((option) => (
+                      <Button
+                        key={option.id}
+                        onClick={() => handleMultipleChoiceAnswer(option.id)}
+                        variant={mcFeedback?.selectedOptionId === option.id ? "default" : "outline"}
+                        className="w-full text-left justify-start h-auto py-3 px-4"
+                        disabled={isCompleted}
+                      >
+                        <div className="text-left">
+                          <p>{option.text}</p>
+                          {mcFeedback?.selectedOptionId === option.id && (
+                            <p className="text-sm text-muted-foreground mt-1">
+                              {option.explanation}
+                            </p>
+                          )}
+                        </div>
+                      </Button>
+                    ))}
+                  </div>
+                </div>
+              )}
               
-              {feedback && (
+              {currentFIBScenario && (
+                <div className="space-y-3">
+                  <h3 className="font-medium">
+                    {userPreferences.language === "zh" ? "你的回应：" : "Your Response:"}
+                  </h3>
+                  <Textarea
+                    placeholder={userPreferences.language === "zh"
+                      ? "输入你会如何回应这个陈述..."
+                      : "Type how you would respond to this statement..."}
+                    className="min-h-[120px]"
+                    value={userResponse}
+                    onChange={(e) => setUserResponse(e.target.value)}
+                    disabled={isCompleted}
+                  />
+                </div>
+              )}
+              
+              {mcFeedback && (
                 <div className="space-y-4 mt-4">
                   <div className="flex items-center justify-between">
                     <h3 className="font-medium">
                       {userPreferences.language === "zh" ? "反馈" : "Feedback"}
                     </h3>
-                    <Badge variant={feedback.score >= 7 ? "default" : feedback.score >= 4 ? "outline" : "destructive"}>
-                      {userPreferences.language === "zh" ? "分数：" : "Score: "}{feedback.score}/10
+                    <Badge variant={mcFeedback.isCorrect ? "default" : mcFeedback.score >= 6 ? "outline" : "destructive"}>
+                      {userPreferences.language === "zh" ? "分数：" : "Score: "}{mcFeedback.score}/10
+                    </Badge>
+                  </div>
+                  
+                  <div className={`p-3 rounded-lg ${
+                    mcFeedback.isCorrect 
+                      ? "bg-green-50 dark:bg-green-950" 
+                      : "bg-amber-50 dark:bg-amber-950"
+                  }`}>
+                    <div className="flex items-start gap-2">
+                      {mcFeedback.isCorrect ? (
+                        <CheckCircle className="h-5 w-5 text-green-600 dark:text-green-400 mt-0.5" />
+                      ) : (
+                        <AlertCircle className="h-5 w-5 text-amber-600 dark:text-amber-400 mt-0.5" />
+                      )}
+                      <div>
+                        <h4 className={`font-medium ${
+                          mcFeedback.isCorrect 
+                            ? "text-green-800 dark:text-green-300" 
+                            : "text-amber-800 dark:text-amber-300"
+                        }`}>
+                          {mcFeedback.isCorrect 
+                            ? (userPreferences.language === "zh" ? "正确答案！" : "Correct Answer!")
+                            : (userPreferences.language === "zh" ? "可以改进" : "Room for Improvement")
+                          }
+                        </h4>
+                        <p className="mt-1 text-sm text-muted-foreground">
+                          {mcFeedback.explanation}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <div className="bg-blue-50 dark:bg-blue-950 p-3 rounded-lg">
+                    <div className="flex items-start gap-2">
+                      <Lightbulb className="h-5 w-5 text-blue-600 dark:text-blue-400 mt-0.5" />
+                      <div>
+                        <h4 className="font-medium text-blue-800 dark:text-blue-300">
+                          {userPreferences.language === "zh" ? "场景解释" : "Scenario Explanation"}
+                        </h4>
+                        <p className="mt-1 text-sm text-muted-foreground">
+                          {currentMCScenario?.explanation}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+              
+              {fibFeedback && (
+                <div className="space-y-4 mt-4">
+                  <div className="flex items-center justify-between">
+                    <h3 className="font-medium">
+                      {userPreferences.language === "zh" ? "AI评估反馈" : "AI Evaluation Feedback"}
+                    </h3>
+                    <Badge variant={fibFeedback.score >= 7 ? "default" : fibFeedback.score >= 4 ? "outline" : "destructive"}>
+                      {userPreferences.language === "zh" ? "分数：" : "Score: "}{fibFeedback.score}/10
                     </Badge>
                   </div>
                   
                   <div className="space-y-4">
-                    <div className="bg-green-50 dark:bg-green-950 p-3 rounded-lg">
-                      <div className="flex items-start gap-2">
-                        <CheckCircle className="h-5 w-5 text-green-600 dark:text-green-400 mt-0.5" />
-                        <div>
-                          <h4 className="font-medium text-green-800 dark:text-green-300">
-                            {userPreferences.language === "zh" ? "优点" : "Strengths"}
-                          </h4>
-                          <ul className="mt-1 list-disc list-inside text-sm space-y-1 text-muted-foreground">
-                            {feedback.strengths.map((strength, i) => (
-                              <li key={i}>{strength}</li>
-                            ))}
-                          </ul>
+                    {fibFeedback.strengths.length > 0 && (
+                      <div className="bg-green-50 dark:bg-green-950 p-3 rounded-lg">
+                        <div className="flex items-start gap-2">
+                          <CheckCircle className="h-5 w-5 text-green-600 dark:text-green-400 mt-0.5" />
+                          <div>
+                            <h4 className="font-medium text-green-800 dark:text-green-300">
+                              {userPreferences.language === "zh" ? "优点" : "Strengths"}
+                            </h4>
+                            <ul className="mt-1 list-disc list-inside text-sm space-y-1 text-muted-foreground">
+                              {fibFeedback.strengths.map((strength, i) => (
+                                <li key={i}>{strength}</li>
+                              ))}
+                            </ul>
+                          </div>
                         </div>
                       </div>
-                    </div>
+                    )}
                     
-                    {feedback.improvements.length > 0 && (
+                    {fibFeedback.improvements.length > 0 && (
                       <div className="bg-amber-50 dark:bg-amber-950 p-3 rounded-lg">
                         <div className="flex items-start gap-2">
                           <AlertCircle className="h-5 w-5 text-amber-600 dark:text-amber-400 mt-0.5" />
@@ -440,7 +636,7 @@ export function TrainingMode({ userPreferences }: TrainingModeProps) {
                               {userPreferences.language === "zh" ? "改进空间" : "Areas for Improvement"}
                             </h4>
                             <ul className="mt-1 list-disc list-inside text-sm space-y-1 text-muted-foreground">
-                              {feedback.improvements.map((improvement, i) => (
+                              {fibFeedback.improvements.map((improvement, i) => (
                                 <li key={i}>{improvement}</li>
                               ))}
                             </ul>
@@ -457,8 +653,30 @@ export function TrainingMode({ userPreferences }: TrainingModeProps) {
                             {userPreferences.language === "zh" ? "建议" : "Suggestions"}
                           </h4>
                           <p className="mt-1 text-sm text-muted-foreground">
-                            {feedback.suggestions}
+                            {fibFeedback.suggestions}
                           </p>
+                        </div>
+                      </div>
+                    </div>
+                    
+                    <div className="bg-purple-50 dark:bg-purple-950 p-3 rounded-lg">
+                      <div className="flex items-start gap-2">
+                        <Target className="h-5 w-5 text-purple-600 dark:text-purple-400 mt-0.5" />
+                        <div>
+                          <h4 className="font-medium text-purple-800 dark:text-purple-300">
+                            {userPreferences.language === "zh" ? "与标准答案对比" : "Comparison with Standard Answer"}
+                          </h4>
+                          <p className="mt-1 text-sm text-muted-foreground">
+                            {fibFeedback.comparison}
+                          </p>
+                          <div className="mt-2 p-2 bg-background/50 rounded border">
+                            <p className="text-sm font-medium">
+                              {userPreferences.language === "zh" ? "标准答案：" : "Standard Answer:"}
+                            </p>
+                            <p className="text-sm text-muted-foreground mt-1">
+                              {currentFIBScenario?.standardAnswer}
+                            </p>
+                          </div>
                         </div>
                       </div>
                     </div>
@@ -468,16 +686,28 @@ export function TrainingMode({ userPreferences }: TrainingModeProps) {
             </CardContent>
             <CardFooter>
               {!isCompleted ? (
-                <Button 
-                  onClick={analyzeResponse} 
-                  className="w-full"
-                  disabled={!userResponse.trim()}
-                >
-                  {userPreferences.language === "zh" ? "提交回应" : "Submit Response"}
-                </Button>
+                currentMCScenario ? (
+                  <p className="text-sm text-muted-foreground w-full text-center">
+                    {userPreferences.language === "zh" ? "选择一个选项查看反馈" : "Select an option to see feedback"}
+                  </p>
+                ) : (
+                  <Button 
+                    onClick={handleFillInBlankSubmit} 
+                    className="w-full"
+                    disabled={!userResponse.trim() || isEvaluating}
+                  >
+                    {isEvaluating 
+                      ? (userPreferences.language === "zh" ? "AI评估中..." : "AI Evaluating...")
+                      : (userPreferences.language === "zh" ? "提交回应" : "Submit Response")
+                    }
+                  </Button>
+                )
               ) : (
                 <Button 
-                  onClick={() => startTraining(currentScenario.difficulty)}
+                  onClick={() => currentMCScenario 
+                    ? startMultipleChoiceTraining(currentMCScenario.difficulty)
+                    : startFillInBlankTraining(currentFIBScenario!.difficulty)
+                  }
                   className="w-full"
                 >
                   {userPreferences.language === "zh" ? "尝试另一个场景" : "Try Another Scenario"}
