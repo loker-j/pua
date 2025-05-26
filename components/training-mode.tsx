@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -17,6 +17,7 @@ interface TrainingModeProps {
 }
 
 export function TrainingMode({ userPreferences }: TrainingModeProps) {
+  const [isClient, setIsClient] = useState(false);
   const [progress, setProgress] = useLocalStorage<TrainingProgress>("trainingProgress", {
     completedScenarios: [],
     totalScore: 0,
@@ -34,7 +35,13 @@ export function TrainingMode({ userPreferences }: TrainingModeProps) {
   } | null>(null);
   const [isCompleted, setIsCompleted] = useState(false);
 
+  useEffect(() => {
+    setIsClient(true);
+  }, []);
+
   const startTraining = (difficulty: "easy" | "medium" | "hard") => {
+    if (!isClient) return;
+    
     const availableScenarios = trainingScenarios.filter(
       scenario => 
         scenario.difficulty === difficulty && 
@@ -56,7 +63,7 @@ export function TrainingMode({ userPreferences }: TrainingModeProps) {
   };
 
   const analyzeResponse = () => {
-    if (!currentScenario || !userResponse.trim()) return;
+    if (!currentScenario || !userResponse.trim() || !isClient) return;
     
     const response = userResponse.toLowerCase();
     const points = currentScenario.idealResponsePoints;
@@ -181,7 +188,18 @@ export function TrainingMode({ userPreferences }: TrainingModeProps) {
 
   return (
     <div className="space-y-6 animate-in fade-in duration-500">
-      {!currentScenario ? (
+      {!isClient ? (
+        <div className="flex items-center justify-center min-h-[400px]">
+          <div className="text-center">
+            <h3 className="text-lg font-medium mb-2">
+              {userPreferences.language === "zh" ? "加载中..." : "Loading..."}
+            </h3>
+            <p className="text-muted-foreground">
+              {userPreferences.language === "zh" ? "正在初始化训练模式" : "Initializing training mode"}
+            </p>
+          </div>
+        </div>
+      ) : !currentScenario ? (
         <>
           <div className="flex flex-col md:flex-row gap-4 md:items-center md:justify-between">
             <div>

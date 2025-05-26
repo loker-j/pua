@@ -48,6 +48,11 @@ export function PhraseLibrary({ userPreferences }: PhraseLibraryProps) {
         case "relationship": return "感情";
         case "family": return "家庭";
         case "general": return "通用";
+        case "Guilt-tripping": return "内疚操控";
+        case "Love bombing": return "爱情轰炸";
+        case "Gaslighting": return "煤气灯效应";
+        case "Isolation tactics": return "孤立策略";
+        case "Negging": return "负面评价";
         default: return category;
       }
     }
@@ -62,6 +67,11 @@ export function PhraseLibrary({ userPreferences }: PhraseLibraryProps) {
         case "relationship": return "感情";
         case "family": return "家庭";
         case "general": return "通用";
+        case "Guilt-tripping": return "内疚操控";
+        case "Love bombing": return "爱情轰炸";
+        case "Gaslighting": return "煤气灯效应";
+        case "Isolation tactics": return "孤立策略";
+        case "Negging": return "负面评价";
         case "favorites": return "收藏";
         default: return value;
       }

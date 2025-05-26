@@ -1,4 +1,4 @@
-export type PUACategory = "workplace" | "relationship" | "family" | "general";
+export type PUACategory = "Guilt-tripping" | "Love bombing" | "Gaslighting" | "Isolation tactics" | "Negging" | "workplace" | "relationship" | "family" | "general";
 
 export type ResponseStyle = "mild" | "firm" | "analytical";
 

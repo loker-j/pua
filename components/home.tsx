@@ -4,7 +4,7 @@ import { useState } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { PUAAnalyzer } from "@/components/pua-analyzer";
 import { PhraseLibrary } from "@/components/phrase-library";
-import { TrainingMode } from "@/components/training-mode";
+// import { TrainingMode } from "@/components/training-mode";
 import { UserSettings } from "@/components/user-settings";
 import { Header } from "@/components/header";
 import { Footer } from "@/components/footer";
@@ -35,10 +35,10 @@ export function Home() {
       <Header />
       <main className="flex-1 container mx-auto px-4 py-6">
         <Tabs defaultValue="analyzer" className="w-full">
-          <TabsList className="grid grid-cols-4 mb-8">
+          <TabsList className="grid grid-cols-3 mb-8">
             <TabsTrigger value="analyzer">{getTabLabel("analyzer")}</TabsTrigger>
             <TabsTrigger value="library">{getTabLabel("library")}</TabsTrigger>
-            <TabsTrigger value="training">{getTabLabel("training")}</TabsTrigger>
+            {/* <TabsTrigger value="training">{getTabLabel("training")}</TabsTrigger> */}
             <TabsTrigger value="settings">{getTabLabel("settings")}</TabsTrigger>
           </TabsList>
           <TabsContent value="analyzer" className="mt-6">
@@ -47,9 +47,9 @@ export function Home() {
           <TabsContent value="library" className="mt-6">
             <PhraseLibrary userPreferences={userPreferences} />
           </TabsContent>
-          <TabsContent value="training" className="mt-6">
+          {/* <TabsContent value="training" className="mt-6">
             <TrainingMode userPreferences={userPreferences} />
-          </TabsContent>
+          </TabsContent> */}
           <TabsContent value="settings" className="mt-6">
             <UserSettings 
               userPreferences={userPreferences} 

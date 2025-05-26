@@ -76,7 +76,12 @@ export function UserSettings({ userPreferences, setUserPreferences }: UserSettin
       workplace: localPrefs.language === "zh" ? "职场" : "Workplace",
       relationship: localPrefs.language === "zh" ? "感情" : "Relationship",
       family: localPrefs.language === "zh" ? "家庭" : "Family",
-      general: localPrefs.language === "zh" ? "通用" : "General"
+      general: localPrefs.language === "zh" ? "通用" : "General",
+      "Guilt-tripping": localPrefs.language === "zh" ? "内疚操控" : "Guilt-tripping",
+      "Love bombing": localPrefs.language === "zh" ? "爱情轰炸" : "Love bombing",
+      "Gaslighting": localPrefs.language === "zh" ? "煤气灯效应" : "Gaslighting",
+      "Isolation tactics": localPrefs.language === "zh" ? "孤立策略" : "Isolation tactics",
+      "Negging": localPrefs.language === "zh" ? "负面评价" : "Negging"
     };
     return labels[category] || category;
   };
