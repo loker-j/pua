@@ -13,7 +13,7 @@ export function Header() {
 
   const getSlogan = () => {
     if (userPreferences.language === "zh") {
-      return "⚡ 识破包装精美的情感陷阱";
+      return "⚡ 识破包装精美的语言陷阱";
     }
     return "⚡ Expose Beautifully Packaged Emotional Traps";
   };
