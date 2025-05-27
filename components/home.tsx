@@ -11,9 +11,9 @@ import { Footer } from "@/components/footer";
 import { useLocalStorage } from "@/hooks/use-local-storage";
 import { UserPreferences, defaultUserPreferences } from "@/types/user";
 
-// 使用更简单的动态导入语法
+// 修复动态导入语法，正确处理命名导出
 const TrainingMode = dynamic(
-  () => import("@/components/training-mode").then((mod) => ({ default: mod.TrainingMode })),
+  () => import("@/components/training-mode").then((mod) => mod.TrainingMode),
   {
     ssr: false,
     loading: () => (
@@ -38,7 +38,17 @@ export function Home() {
   useEffect(() => {
     setIsMounted(true);
     console.log("Home component mounted");
-  }, []);
+    
+    // 添加超时机制，防止无限加载
+    const timeout = setTimeout(() => {
+      if (!isPreferencesInitialized) {
+        console.warn("Preferences initialization timeout, forcing initialization");
+        setIsMounted(true);
+      }
+    }, 3000); // 3秒超时
+    
+    return () => clearTimeout(timeout);
+  }, [isPreferencesInitialized]);
 
   useEffect(() => {
     console.log("Preferences initialized:", isPreferencesInitialized);
@@ -46,7 +56,7 @@ export function Home() {
   }, [isPreferencesInitialized, userPreferences]);
 
   const getTabLabel = (key: string) => {
-    if (userPreferences.language === "zh") {
+    if (userPreferences?.language === "zh") {
       switch (key) {
         case "analyzer": return "分析器";
         case "library": return "短语库";
@@ -63,8 +73,10 @@ export function Home() {
     setActiveTab(value);
   };
 
-  // 在客户端挂载和偏好设置初始化完成前显示加载状态
-  if (!isMounted || !isPreferencesInitialized) {
+  // 改进加载条件：如果3秒后仍未初始化，强制显示内容
+  const shouldShowLoading = !isMounted || (!isPreferencesInitialized && isMounted);
+  
+  if (shouldShowLoading) {
     return (
       <div className="flex min-h-screen flex-col">
         <Header />
@@ -75,6 +87,11 @@ export function Home() {
               <p className="text-muted-foreground">
                 正在初始化应用 (挂载: {isMounted ? "✓" : "✗"}, 偏好: {isPreferencesInitialized ? "✓" : "✗"})
               </p>
+              {isMounted && !isPreferencesInitialized && (
+                <p className="text-xs text-muted-foreground mt-2">
+                  如果长时间加载，请刷新页面
+                </p>
+              )}
             </div>
           </div>
         </main>

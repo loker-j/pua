@@ -733,12 +733,12 @@ export function TrainingMode({ userPreferences }: TrainingModeProps) {
               </CardHeader>
               <CardContent>
                 <ul className="space-y-2">
-                  {currentScenario.tips?.map((tip, index) => (
+                  {(currentScenario as any)?.tips?.map((tip: string, index: number) => (
                     <li key={index} className="flex items-start gap-2">
                       <Lightbulb className="h-5 w-5 text-amber-500 mt-0.5 shrink-0" />
                       <span>{tip}</span>
                     </li>
-                  ))}
+                  )) || []}
                 </ul>
               </CardContent>
             </Card>
