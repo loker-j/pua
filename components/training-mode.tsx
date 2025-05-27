@@ -32,7 +32,7 @@ interface FillInBlankFeedback {
   comparison: string;
 }
 
-export function TrainingMode({ userPreferences }: TrainingModeProps) {
+export default function TrainingMode({ userPreferences }: TrainingModeProps) {
   const [isClient, setIsClient] = useState(false);
   const [isMounted, setIsMounted] = useState(false);
   
@@ -749,3 +749,6 @@ export function TrainingMode({ userPreferences }: TrainingModeProps) {
     </div>
   );
 }
+
+// 保持命名导出的兼容性
+export { TrainingMode };

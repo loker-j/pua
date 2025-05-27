@@ -11,13 +11,10 @@ import { Footer } from "@/components/footer";
 import { useLocalStorage } from "@/hooks/use-local-storage";
 import { UserPreferences, defaultUserPreferences } from "@/types/user";
 
-// 简化动态导入，移除loading状态
-const TrainingMode = dynamic(
-  () => import("@/components/training-mode").then((mod) => mod.TrainingMode),
-  {
-    ssr: false,
-  }
-);
+// 使用最简单的动态导入
+const TrainingMode = dynamic(() => import("@/components/training-mode"), {
+  ssr: false,
+});
 
 export function Home() {
   const [isMounted, setIsMounted] = useState(false);
@@ -49,7 +46,7 @@ export function Home() {
     setActiveTab(value);
   };
 
-  // 简化渲染逻辑：只要组件挂载就直接渲染
+  // 简化渲染逻辑：直接渲染，不需要复杂的加载检查
   return (
     <div className="flex min-h-screen flex-col">
       <Header />
