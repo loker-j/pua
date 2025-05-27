@@ -29,6 +29,7 @@ const TrainingMode = dynamic(
 
 export function Home() {
   const [isMounted, setIsMounted] = useState(false);
+  const [activeTab, setActiveTab] = useState("analyzer");
   const [userPreferences, setUserPreferences, isPreferencesInitialized] = useLocalStorage<UserPreferences>(
     "userPreferences",
     defaultUserPreferences
@@ -36,7 +37,13 @@ export function Home() {
 
   useEffect(() => {
     setIsMounted(true);
+    console.log("Home component mounted");
   }, []);
+
+  useEffect(() => {
+    console.log("Preferences initialized:", isPreferencesInitialized);
+    console.log("User preferences:", userPreferences);
+  }, [isPreferencesInitialized, userPreferences]);
 
   const getTabLabel = (key: string) => {
     if (userPreferences.language === "zh") {
@@ -51,7 +58,12 @@ export function Home() {
     return key.charAt(0).toUpperCase() + key.slice(1);
   };
 
-  // 等待客户端挂载和localStorage初始化完成
+  const handleTabChange = (value: string) => {
+    console.log("Tab change requested:", value);
+    setActiveTab(value);
+  };
+
+  // 在客户端挂载和偏好设置初始化完成前显示加载状态
   if (!isMounted || !isPreferencesInitialized) {
     return (
       <div className="flex min-h-screen flex-col">
@@ -60,7 +72,9 @@ export function Home() {
           <div className="flex items-center justify-center min-h-[400px]">
             <div className="text-center">
               <h3 className="text-lg font-medium mb-2">加载中...</h3>
-              <p className="text-muted-foreground">正在初始化应用</p>
+              <p className="text-muted-foreground">
+                正在初始化应用 (挂载: {isMounted ? "✓" : "✗"}, 偏好: {isPreferencesInitialized ? "✓" : "✗"})
+              </p>
             </div>
           </div>
         </main>
@@ -73,12 +87,20 @@ export function Home() {
     <div className="flex min-h-screen flex-col">
       <Header />
       <main className="flex-1 container mx-auto px-4 py-6">
-        <Tabs defaultValue="analyzer" className="w-full">
+        <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full">
           <TabsList className="grid grid-cols-4 mb-8">
-            <TabsTrigger value="analyzer">{getTabLabel("analyzer")}</TabsTrigger>
-            <TabsTrigger value="library">{getTabLabel("library")}</TabsTrigger>
-            <TabsTrigger value="training">{getTabLabel("training")}</TabsTrigger>
-            <TabsTrigger value="settings">{getTabLabel("settings")}</TabsTrigger>
+            <TabsTrigger value="analyzer" onClick={() => console.log("Analyzer tab clicked")}>
+              {getTabLabel("analyzer")}
+            </TabsTrigger>
+            <TabsTrigger value="library" onClick={() => console.log("Library tab clicked")}>
+              {getTabLabel("library")}
+            </TabsTrigger>
+            <TabsTrigger value="training" onClick={() => console.log("Training tab clicked")}>
+              {getTabLabel("training")}
+            </TabsTrigger>
+            <TabsTrigger value="settings" onClick={() => console.log("Settings tab clicked")}>
+              {getTabLabel("settings")}
+            </TabsTrigger>
           </TabsList>
           <TabsContent value="analyzer" className="mt-6">
             <PUAAnalyzer userPreferences={userPreferences} />

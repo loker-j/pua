@@ -73,7 +73,7 @@ export function TrainingMode({ userPreferences }: TrainingModeProps) {
     const availableScenarios = multipleChoiceScenarios.filter(
       scenario => 
         scenario.difficulty === difficulty && 
-        !progress.completedScenarios.includes(scenario.id)
+        !(progress?.completedScenarios?.includes(scenario.id))
     );
     
     const scenariosToChooseFrom = availableScenarios.length > 0 
@@ -98,7 +98,7 @@ export function TrainingMode({ userPreferences }: TrainingModeProps) {
     const availableScenarios = fillInBlankScenarios.filter(
       scenario => 
         scenario.difficulty === difficulty && 
-        !progress.completedScenarios.includes(scenario.id)
+        !(progress?.completedScenarios?.includes(scenario.id))
     );
     
     const scenariosToChooseFrom = availableScenarios.length > 0 
@@ -134,18 +134,22 @@ export function TrainingMode({ userPreferences }: TrainingModeProps) {
     setIsCompleted(true);
     
     // 更新进度
-    if (!progress.completedScenarios.includes(currentMCScenario.id)) {
+    if (!progress?.completedScenarios?.includes(currentMCScenario.id)) {
       const newProgress = {
         ...progress,
-        completedScenarios: [...progress.completedScenarios, currentMCScenario.id],
-        totalScore: progress.totalScore + selectedOption.score,
+        completedScenarios: [...(progress?.completedScenarios || []), currentMCScenario.id],
+        totalScore: (progress?.totalScore || 0) + selectedOption.score,
         lastTrainingDate: Date.now(),
         multipleChoiceStats: {
-          totalAttempts: progress.multipleChoiceStats.totalAttempts + 1,
-          correctAnswers: progress.multipleChoiceStats.correctAnswers + (selectedOption.isCorrect ? 1 : 0),
-          averageScore: ((progress.multipleChoiceStats.averageScore * progress.multipleChoiceStats.totalAttempts) + selectedOption.score) / (progress.multipleChoiceStats.totalAttempts + 1)
+          totalAttempts: (progress?.multipleChoiceStats?.totalAttempts || 0) + 1,
+          correctAnswers: (progress?.multipleChoiceStats?.correctAnswers || 0) + (selectedOption.isCorrect ? 1 : 0),
+          averageScore: (((progress?.multipleChoiceStats?.averageScore || 0) * (progress?.multipleChoiceStats?.totalAttempts || 0)) + selectedOption.score) / ((progress?.multipleChoiceStats?.totalAttempts || 0) + 1)
         },
-        fillInBlankStats: progress.fillInBlankStats
+        fillInBlankStats: progress?.fillInBlankStats || {
+          totalAttempts: 0,
+          averageScore: 0,
+          improvementTrend: []
+        }
       };
       setProgress(newProgress);
     }
@@ -181,17 +185,21 @@ export function TrainingMode({ userPreferences }: TrainingModeProps) {
       setIsCompleted(true);
       
       // 更新进度
-      if (!progress.completedScenarios.includes(currentFIBScenario.id)) {
-        const newTrend = [...progress.fillInBlankStats.improvementTrend, evaluation.score].slice(-10);
+      if (!progress?.completedScenarios?.includes(currentFIBScenario.id)) {
+        const newTrend = [...(progress?.fillInBlankStats?.improvementTrend || []), evaluation.score].slice(-10);
         const newProgress = {
           ...progress,
-          completedScenarios: [...progress.completedScenarios, currentFIBScenario.id],
-          totalScore: progress.totalScore + evaluation.score,
+          completedScenarios: [...(progress?.completedScenarios || []), currentFIBScenario.id],
+          totalScore: (progress?.totalScore || 0) + evaluation.score,
           lastTrainingDate: Date.now(),
-          multipleChoiceStats: progress.multipleChoiceStats,
+          multipleChoiceStats: progress?.multipleChoiceStats || {
+            totalAttempts: 0,
+            correctAnswers: 0,
+            averageScore: 0
+          },
           fillInBlankStats: {
-            totalAttempts: progress.fillInBlankStats.totalAttempts + 1,
-            averageScore: ((progress.fillInBlankStats.averageScore * progress.fillInBlankStats.totalAttempts) + evaluation.score) / (progress.fillInBlankStats.totalAttempts + 1),
+            totalAttempts: (progress?.fillInBlankStats?.totalAttempts || 0) + 1,
+            averageScore: (((progress?.fillInBlankStats?.averageScore || 0) * (progress?.fillInBlankStats?.totalAttempts || 0)) + evaluation.score) / ((progress?.fillInBlankStats?.totalAttempts || 0) + 1),
             improvementTrend: newTrend
           }
         };
@@ -237,10 +245,10 @@ export function TrainingMode({ userPreferences }: TrainingModeProps) {
   };
 
   const completionPercentage = isMounted && (multipleChoiceScenarios.length + fillInBlankScenarios.length) > 0
-    ? Math.round((progress.completedScenarios.length / (multipleChoiceScenarios.length + fillInBlankScenarios.length)) * 100)
+    ? Math.round(((progress?.completedScenarios?.length || 0) / (multipleChoiceScenarios.length + fillInBlankScenarios.length)) * 100)
     : 0;
 
-  if (!isMounted) {
+  if (!isMounted || !isProgressInitialized) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
         <div className="text-center">
@@ -304,15 +312,15 @@ export function TrainingMode({ userPreferences }: TrainingModeProps) {
                     <p className="text-sm text-muted-foreground">
                       {userPreferences.language === "zh" ? "已完成场景" : "Scenarios Completed"}
                     </p>
-                    <p className="text-2xl font-bold">{progress.completedScenarios.length}</p>
+                    <p className="text-2xl font-bold">{progress?.completedScenarios?.length || 0}</p>
                   </div>
                   <div className="bg-muted/40 p-3 rounded-lg">
                     <p className="text-sm text-muted-foreground">
                       {userPreferences.language === "zh" ? "平均分数" : "Average Score"}
                     </p>
                     <p className="text-2xl font-bold">
-                      {progress.completedScenarios.length > 0
-                        ? Math.round(progress.totalScore / progress.completedScenarios.length)
+                      {(progress?.completedScenarios?.length || 0) > 0
+                        ? Math.round((progress?.totalScore || 0) / (progress?.completedScenarios?.length || 1))
                         : 0}
                       <span className="text-sm text-muted-foreground">/10</span>
                     </p>
@@ -325,8 +333,8 @@ export function TrainingMode({ userPreferences }: TrainingModeProps) {
                       {userPreferences.language === "zh" ? "选择题正确率" : "Multiple Choice Accuracy"}
                     </p>
                     <p className="text-lg font-bold text-blue-700 dark:text-blue-300">
-                      {progress.multipleChoiceStats.totalAttempts > 0
-                        ? Math.round((progress.multipleChoiceStats.correctAnswers / progress.multipleChoiceStats.totalAttempts) * 100)
+                      {progress?.multipleChoiceStats?.totalAttempts > 0
+                        ? Math.round((progress?.multipleChoiceStats?.correctAnswers / progress?.multipleChoiceStats?.totalAttempts) * 100)
                         : 0}%
                     </p>
                   </div>
@@ -335,17 +343,17 @@ export function TrainingMode({ userPreferences }: TrainingModeProps) {
                       {userPreferences.language === "zh" ? "填空题平均分" : "Fill-in-Blank Average"}
                     </p>
                     <p className="text-lg font-bold text-green-700 dark:text-green-300">
-                      {progress.fillInBlankStats.totalAttempts > 0
-                        ? Math.round(progress.fillInBlankStats.averageScore)
+                      {progress?.fillInBlankStats?.totalAttempts > 0
+                        ? Math.round(progress?.fillInBlankStats?.averageScore)
                         : 0}/10
                     </p>
                   </div>
                 </div>
                 
-                {progress.lastTrainingDate > 0 && (
+                {(progress?.lastTrainingDate || 0) > 0 && (
                   <div className="text-sm text-muted-foreground">
                     {userPreferences.language === "zh" ? "上次训练：" : "Last training: "}
-                    {new Date(progress.lastTrainingDate).toLocaleDateString()}
+                    {new Date(progress?.lastTrainingDate || 0).toLocaleDateString()}
                   </div>
                 )}
               </CardContent>

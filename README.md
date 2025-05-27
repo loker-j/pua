@@ -136,6 +136,20 @@ npx tsc --noEmit
    - 添加了 `isMounted` 状态来防止 hydration 不匹配
    - 重新启用训练模式功能
 
+5. **训练模式初始化问题修复** (2025-01-XX)：
+   - 🐛 **修复运行时错误**：解决了 `Cannot read properties of undefined (reading 'totalAttempts')` 错误
+   - 🔧 **加强初始化检查**：将加载条件从 `!isMounted` 改为 `!isMounted || !isProgressInitialized`
+   - 🛡️ **添加可选链操作符**：所有对 `progress` 属性的访问都使用了 `?.` 操作符，防止 undefined 错误
+   - 📊 **安全的统计信息渲染**：
+     - `progress?.multipleChoiceStats?.totalAttempts` 替代直接访问
+     - `progress?.fillInBlankStats?.averageScore` 替代直接访问
+     - 添加了默认值处理：`progress?.completedScenarios?.length || 0`
+   - 🔄 **改进进度更新逻辑**：
+     - 在 `handleMultipleChoiceAnswer` 中添加安全检查
+     - 在 `handleFillInBlankSubmit` 中添加安全检查
+     - 确保所有 progress 属性更新都有默认值保护
+   - ✅ **确保组件稳定性**：防止在 SSR 或初始加载时的 undefined 错误，保持所有环境下的稳定运行
+
 ### 📊 构建结果
 
 ```
@@ -232,6 +246,30 @@ MIT License
   - 构建成功率100%，无语法错误
   - 优化的代码分割，减少初始加载时间
   - 改进的错误处理和类型安全
+
+### v1.1.1 (2025-01-XX) - 🛡️ 训练模式稳定性修复
+- 🐛 **修复训练模式初始化错误**：
+  - 解决了 `Cannot read properties of undefined (reading 'totalAttempts')` 运行时错误
+  - 修复了在组件初始化时 progress 对象未完全加载导致的崩溃问题
+  
+- 🔧 **加强组件初始化检查**：
+  - 将加载条件从 `!isMounted` 升级为 `!isMounted || !isProgressInitialized`
+  - 确保只有在 progress 对象完全初始化后才渲染统计信息
+  
+- 🛡️ **全面添加可选链保护**：
+  - 所有 progress 属性访问都使用可选链操作符 (`?.`)
+  - 添加默认值处理，防止 undefined 错误
+  - 涵盖统计显示、进度更新、场景过滤等所有相关功能
+  
+- 📊 **优化数据安全访问**：
+  - `progress?.multipleChoiceStats?.totalAttempts` 安全访问选择题统计
+  - `progress?.fillInBlankStats?.averageScore` 安全访问填空题统计  
+  - `progress?.completedScenarios?.length || 0` 安全获取完成场景数量
+  
+- ✅ **提升跨环境兼容性**：
+  - 防止 SSR 和客户端渲染不匹配问题
+  - 确保在所有加载状态下的组件稳定性
+  - 保持原有功能逻辑完整性
 
 ### 📊 最新构建结果
 
