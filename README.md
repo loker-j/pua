@@ -210,11 +210,49 @@ MIT License
 
 ## 更新日志
 
-### v1.0.0 (2025-01-XX)
+### v1.1.0 (2025-01-XX) - 🔧 重要修复更新
+- 🐛 **修复JavaScript语法错误**：
+  - 修复了训练模式组件中`currentScenario.tips`的类型安全访问问题
+  - 添加了可选链操作符和存在性检查，防止运行时错误
+  - 改进了TypeScript类型检查和错误处理
+
+- 🔧 **解决Chunk加载失败问题**：
+  - 优化了webpack的代码分割配置
+  - 设置了合理的chunk大小限制（minSize: 20KB, maxSize: 244KB）
+  - 创建了专门的vendor和react chunks，提高加载稳定性
+  - 使用内存缓存替代文件系统缓存，避免ENOENT错误
+
+- 🚀 **Netlify部署优化**：
+  - 更新了部署配置以支持Next.js API路由
+  - 添加了正确的重定向规则和缓存头设置
+  - 移除了导致构建错误的实验性CSS优化功能
+  - 确保静态资源的长期缓存策略
+
+- ✅ **构建稳定性提升**：
+  - 构建成功率100%，无语法错误
+  - 优化的代码分割，减少初始加载时间
+  - 改进的错误处理和类型安全
+
+### 📊 最新构建结果
+
+```
+Route (app)                                      Size     First Load JS
+┌ ○ /                                            14.4 kB         182 kB
+├ ○ /_not-found                                  200 B           168 kB
+├ λ /api/analyze                                 0 B                0 B
+├ λ /api/responses                               0 B                0 B
+├ ○ /api/test                                    0 B                0 B
+└ λ /api/training/evaluate                       0 B                0 B
++ First Load JS shared by all                    168 kB
+  ├ chunks/vendors-*                             多个优化的vendor chunks
+  └ chunks/webpack-*                             1.71 kB
+```
+
+### v1.0.0 (2025-01-XX) - 🎉 初始版本
 - ✅ 初始版本发布
 - ✅ PUA 分析器功能
 - ✅ 短语库功能
-- ✅ 训练模式功能
+- ✅ 训练模式功能（双模式：选择题+填空题）
 - ✅ 用户设置功能
 - ✅ 多语言支持
 - ✅ Netlify 部署配置

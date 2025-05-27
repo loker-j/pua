@@ -716,7 +716,7 @@ export function TrainingMode({ userPreferences }: TrainingModeProps) {
             </CardFooter>
           </Card>
           
-          {!isCompleted && (
+          {!isCompleted && currentScenario && (
             <Card>
               <CardHeader>
                 <CardTitle>
@@ -725,7 +725,7 @@ export function TrainingMode({ userPreferences }: TrainingModeProps) {
               </CardHeader>
               <CardContent>
                 <ul className="space-y-2">
-                  {currentScenario.tips.map((tip, index) => (
+                  {currentScenario.tips?.map((tip, index) => (
                     <li key={index} className="flex items-start gap-2">
                       <Lightbulb className="h-5 w-5 text-amber-500 mt-0.5 shrink-0" />
                       <span>{tip}</span>
