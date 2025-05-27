@@ -68,7 +68,7 @@ export function TrainingMode({ userPreferences }: TrainingModeProps) {
   }, []);
 
   const startMultipleChoiceTraining = (difficulty: "easy" | "medium" | "hard") => {
-    if (!isClient || !isMounted || !isProgressInitialized) return;
+    if (!isClient || !isMounted) return;
     
     const availableScenarios = multipleChoiceScenarios.filter(
       scenario => 
@@ -93,7 +93,7 @@ export function TrainingMode({ userPreferences }: TrainingModeProps) {
   };
 
   const startFillInBlankTraining = (difficulty: "easy" | "medium" | "hard") => {
-    if (!isClient || !isMounted || !isProgressInitialized) return;
+    if (!isClient || !isMounted) return;
     
     const availableScenarios = fillInBlankScenarios.filter(
       scenario => 
@@ -248,7 +248,8 @@ export function TrainingMode({ userPreferences }: TrainingModeProps) {
     ? Math.round(((progress?.completedScenarios?.length || 0) / (multipleChoiceScenarios.length + fillInBlankScenarios.length)) * 100)
     : 0;
 
-  if (!isMounted || !isProgressInitialized) {
+  // 简化加载条件：只检查是否挂载，不等待progress初始化
+  if (!isMounted) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
         <div className="text-center">

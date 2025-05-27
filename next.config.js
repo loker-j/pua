@@ -7,42 +7,27 @@ const nextConfig = {
     unoptimized: true 
   },
   trailingSlash: true,
-  // Configure webpack to properly handle caching and chunking
+  // 为Netlify优化的webpack配置
   webpack: (config, { isServer }) => {
-    // Disable file system cache to prevent ENOENT errors
-    config.cache = {
-      type: 'memory'
-    };
-    
-    // Optimize chunk splitting for better loading
-    if (!isServer) {
-      config.optimization.splitChunks = {
-        chunks: 'all',
-        minSize: 20000,
-        maxSize: 244000,
-        cacheGroups: {
-          default: {
-            minChunks: 2,
-            priority: -20,
-            reuseExistingChunk: true,
-          },
-          vendor: {
-            test: /[\\/]node_modules[\\/]/,
-            name: 'vendors',
-            priority: -10,
-            chunks: 'all',
-          },
-          react: {
-            test: /[\\/]node_modules[\\/](react|react-dom)[\\/]/,
-            name: 'react',
-            priority: 10,
-            chunks: 'all',
-          },
-        },
+    // 在Netlify环境使用文件系统缓存，本地使用内存缓存
+    if (process.env.NETLIFY) {
+      config.cache = false; // 在Netlify上禁用缓存避免问题
+    } else {
+      config.cache = {
+        type: 'memory'
       };
     }
     
     return config;
+  },
+  // 确保API路由正常工作
+  async rewrites() {
+    return [
+      {
+        source: '/api/:path*',
+        destination: '/api/:path*',
+      },
+    ];
   },
 };
 
