@@ -29,31 +29,49 @@ const TrainingMode = dynamic(
 
 export function Home() {
   const [isMounted, setIsMounted] = useState(false);
+  const [isHydrated, setIsHydrated] = useState(false);
   const [activeTab, setActiveTab] = useState("analyzer");
   const [userPreferences, setUserPreferences, isPreferencesInitialized] = useLocalStorage<UserPreferences>(
     "userPreferences",
     defaultUserPreferences
   );
 
+  // 第一个useEffect：处理组件挂载
   useEffect(() => {
+    console.log("Home component mounting...");
     setIsMounted(true);
-    console.log("Home component mounted");
     
-    // 添加超时机制，防止无限加载
+    // 强制触发hydration完成
+    const timer = setTimeout(() => {
+      console.log("Forcing hydration complete");
+      setIsHydrated(true);
+    }, 100);
+    
+    return () => clearTimeout(timer);
+  }, []);
+
+  // 第二个useEffect：处理超时机制
+  useEffect(() => {
+    if (!isMounted) return;
+    
+    console.log("Setting up timeout mechanism");
     const timeout = setTimeout(() => {
-      if (!isPreferencesInitialized) {
-        console.warn("Preferences initialization timeout, forcing initialization");
-        setIsMounted(true);
-      }
-    }, 3000); // 3秒超时
+      console.log("Timeout reached, forcing initialization");
+      setIsHydrated(true);
+    }, 2000); // 减少到2秒
     
     return () => clearTimeout(timeout);
-  }, [isPreferencesInitialized]);
+  }, [isMounted]);
 
+  // 第三个useEffect：监控状态变化
   useEffect(() => {
-    console.log("Preferences initialized:", isPreferencesInitialized);
-    console.log("User preferences:", userPreferences);
-  }, [isPreferencesInitialized, userPreferences]);
+    console.log("State update:", {
+      isMounted,
+      isHydrated,
+      isPreferencesInitialized,
+      userPreferences: userPreferences?.language
+    });
+  }, [isMounted, isHydrated, isPreferencesInitialized, userPreferences]);
 
   const getTabLabel = (key: string) => {
     if (userPreferences?.language === "zh") {
@@ -73,10 +91,10 @@ export function Home() {
     setActiveTab(value);
   };
 
-  // 改进加载条件：如果3秒后仍未初始化，强制显示内容
-  const shouldShowLoading = !isMounted || (!isPreferencesInitialized && isMounted);
+  // 简化加载条件：只要有一个条件满足就显示内容
+  const shouldShowContent = isMounted && (isHydrated || isPreferencesInitialized);
   
-  if (shouldShowLoading) {
+  if (!shouldShowContent) {
     return (
       <div className="flex min-h-screen flex-col">
         <Header />
@@ -85,13 +103,11 @@ export function Home() {
             <div className="text-center">
               <h3 className="text-lg font-medium mb-2">加载中...</h3>
               <p className="text-muted-foreground">
-                正在初始化应用 (挂载: {isMounted ? "✓" : "✗"}, 偏好: {isPreferencesInitialized ? "✓" : "✗"})
+                正在初始化应用 (挂载: {isMounted ? "✓" : "✗"}, 水合: {isHydrated ? "✓" : "✗"}, 偏好: {isPreferencesInitialized ? "✓" : "✗"})
               </p>
-              {isMounted && !isPreferencesInitialized && (
-                <p className="text-xs text-muted-foreground mt-2">
-                  如果长时间加载，请刷新页面
-                </p>
-              )}
+              <div className="mt-4">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
+              </div>
             </div>
           </div>
         </main>
@@ -120,17 +136,17 @@ export function Home() {
             </TabsTrigger>
           </TabsList>
           <TabsContent value="analyzer" className="mt-6">
-            <PUAAnalyzer userPreferences={userPreferences} />
+            <PUAAnalyzer userPreferences={userPreferences || defaultUserPreferences} />
           </TabsContent>
           <TabsContent value="library" className="mt-6">
-            <PhraseLibrary userPreferences={userPreferences} />
+            <PhraseLibrary userPreferences={userPreferences || defaultUserPreferences} />
           </TabsContent>
           <TabsContent value="training" className="mt-6">
-            <TrainingMode userPreferences={userPreferences} />
+            <TrainingMode userPreferences={userPreferences || defaultUserPreferences} />
           </TabsContent>
           <TabsContent value="settings" className="mt-6">
             <UserSettings 
-              userPreferences={userPreferences} 
+              userPreferences={userPreferences || defaultUserPreferences} 
               setUserPreferences={setUserPreferences} 
             />
           </TabsContent>
