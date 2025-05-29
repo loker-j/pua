@@ -11,9 +11,17 @@ import { Footer } from "@/components/footer";
 import { useLocalStorage } from "@/hooks/use-local-storage";
 import { UserPreferences, defaultUserPreferences } from "@/types/user";
 
-// 使用最简单的动态导入
+// 使用动态导入，添加错误处理
 const TrainingMode = dynamic(() => import("@/components/training-mode"), {
-  ssr: false,
+    ssr: false,
+    loading: () => (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <div className="text-center">
+        <h3 className="text-lg font-medium mb-2">加载训练模式中...</h3>
+        <p className="text-muted-foreground">请稍候</p>
+        </div>
+      </div>
+    ),
 });
 
 export function Home() {

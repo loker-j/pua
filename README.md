@@ -232,67 +232,48 @@ MIT License
 
 ## 更新日志
 
-### v1.1.0 (2025-01-XX) - 🔧 重要修复更新
-- 🐛 **修复JavaScript语法错误**：
-  - 修复了训练模式组件中`currentScenario.tips`的类型安全访问问题
-  - 添加了可选链操作符和存在性检查，防止运行时错误
-  - 改进了TypeScript类型检查和错误处理
+### v2.1.0 (2025-01-XX) - 🚀 Netlify部署优化与修复
+- 🔧 **解决Netlify部署加载问题**：
+  - 简化Home组件初始化逻辑，移除复杂的hydration检查机制
+  - 优化TrainingMode组件加载条件，提升页面响应速度
+  - 移除不必要的加载状态和超时机制，改善用户体验
 
-- 🔧 **解决Chunk加载失败问题**：
-  - 优化了webpack的代码分割配置
-  - 设置了合理的chunk大小限制（minSize: 20KB, maxSize: 244KB）
-  - 创建了专门的vendor和react chunks，提高加载稳定性
-  - 使用内存缓存替代文件系统缓存，避免ENOENT错误
-
-- 🚀 **Netlify部署优化**：
-  - 更新了部署配置以支持Next.js API路由
-  - 添加了正确的重定向规则和缓存头设置
-  - 移除了导致构建错误的实验性CSS优化功能
-  - 确保静态资源的长期缓存策略
-
-- ✅ **构建稳定性提升**：
-  - 构建成功率100%，无语法错误
-  - 优化的代码分割，减少初始加载时间
-  - 改进的错误处理和类型安全
-
-### v1.1.1 (2025-01-XX) - 🛡️ 训练模式稳定性修复
-- 🐛 **修复训练模式初始化错误**：
-  - 解决了 `Cannot read properties of undefined (reading 'totalAttempts')` 运行时错误
-  - 修复了在组件初始化时 progress 对象未完全加载导致的崩溃问题
+- 🐛 **修复训练模式启动问题**：
+  - 移除启动函数中的`isProgressInitialized`依赖检查
+  - 简化条件判断逻辑，确保训练模式可以正常启动
+  - 保持本地开发和生产环境的一致性
   
-- 🔧 **加强组件初始化检查**：
-  - 将加载条件从 `!isMounted` 升级为 `!isMounted || !isProgressInitialized`
-  - 确保只有在 progress 对象完全初始化后才渲染统计信息
-  
-- 🛡️ **全面添加可选链保护**：
-  - 所有 progress 属性访问都使用可选链操作符 (`?.`)
-  - 添加默认值处理，防止 undefined 错误
-  - 涵盖统计显示、进度更新、场景过滤等所有相关功能
-  
-- 📊 **优化数据安全访问**：
-  - `progress?.multipleChoiceStats?.totalAttempts` 安全访问选择题统计
-  - `progress?.fillInBlankStats?.averageScore` 安全访问填空题统计  
-  - `progress?.completedScenarios?.length || 0` 安全获取完成场景数量
-  
-- ✅ **提升跨环境兼容性**：
-  - 防止 SSR 和客户端渲染不匹配问题
-  - 确保在所有加载状态下的组件稳定性
-  - 保持原有功能逻辑完整性
+- 🔧 **修复动态导入Chunk加载错误**：
+  - 将TrainingMode组件改为默认导出，解决生产环境chunk加载失败
+  - 保持命名导出兼容性，确保现有代码正常工作
+  - 简化动态导入语法，避免`ChunkLoadError: Loading chunk 34 failed`
+  - 优化webpack配置，禁用可能导致问题的缓存机制
 
-### 📊 最新构建结果
+- ⚡ **Netlify环境适配**：
+  - 针对Netlify环境优化Next.js配置
+  - 简化代码分割策略，提高构建稳定性
+  - 确保API路由在Netlify Functions中正常工作
 
+- 📊 **构建优化结果**：
 ```
-Route (app)                                      Size     First Load JS
-┌ ○ /                                            14.4 kB         182 kB
-├ ○ /_not-found                                  200 B           168 kB
-├ λ /api/analyze                                 0 B                0 B
-├ λ /api/responses                               0 B                0 B
-├ ○ /api/test                                    0 B                0 B
-└ λ /api/training/evaluate                       0 B                0 B
-+ First Load JS shared by all                    168 kB
-  ├ chunks/vendors-*                             多个优化的vendor chunks
-  └ chunks/webpack-*                             1.71 kB
-```
+  Route (app)                              Size     First Load JS
+  ┌ ○ /                                    67 kB           146 kB
+  ├ ○ /_not-found                          872 B          80.2 kB
+  ├ λ /api/analyze                         0 B                0 B
+  ├ λ /api/responses                       0 B                0 B
+  ├ ○ /api/test                            0 B                0 B
+  └ λ /api/training/evaluate               0 B                0 B
+  + First Load JS shared by all            79.3 kB
+  ```
+
+### v2.0.0 - 双模式训练系统
+- ✨ 新增选择题训练模式，本地评分，即时反馈
+- ✨ 新增填空题训练模式，AI智能评分，深度分析
+- ✨ 重新设计训练进度跟踪系统
+- ✨ 添加分类统计和改进趋势分析
+- ✨ 优化用户界面，提升交互体验
+- 🔧 修复服务器端渲染兼容性问题
+- 📚 扩展训练场景数据库
 
 ### v1.0.0 (2025-01-XX) - 🎉 初始版本
 - ✅ 初始版本发布

@@ -25,17 +25,17 @@ export function useLocalStorage<T>(key: string, initialValue: T) {
     const initTimer = setTimeout(() => {
       try {
         console.log(`useLocalStorage: Attempting to read ${key} from localStorage`);
-        const item = window.localStorage.getItem(key);
-        if (item) {
-          const parsedValue = JSON.parse(item);
+      const item = window.localStorage.getItem(key);
+      if (item) {
+        const parsedValue = JSON.parse(item);
           console.log(`useLocalStorage: Successfully loaded ${key}:`, parsedValue);
-          setStoredValue(parsedValue);
+        setStoredValue(parsedValue);
         } else {
           console.log(`useLocalStorage: No existing value for ${key}, using default`);
         }
-      } catch (error) {
+    } catch (error) {
         console.error(`useLocalStorage: Error reading ${key}:`, error);
-        setStoredValue(initialValue);
+      setStoredValue(initialValue);
       } finally {
         setIsInitialized(true);
         console.log(`useLocalStorage: ${key} initialization complete`);
@@ -46,8 +46,8 @@ export function useLocalStorage<T>(key: string, initialValue: T) {
     const fallbackTimer = setTimeout(() => {
       if (!isInitialized) {
         console.warn(`useLocalStorage: Fallback initialization for ${key}`);
-        setIsInitialized(true);
-      }
+      setIsInitialized(true);
+    }
     }, 1000); // 1秒后强制初始化
 
     return () => {
