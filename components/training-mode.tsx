@@ -36,7 +36,10 @@ export default function TrainingMode({ userPreferences }: TrainingModeProps) {
   const [currentMCScenario, setCurrentMCScenario] = useState<MultipleChoiceScenario | null>(null);
   const [currentFIBScenario, setCurrentFIBScenario] = useState<FillInBlankScenario | null>(null);
   const [mcFeedback, setMCFeedback] = useState<MultipleChoiceFeedback | null>(null);
+  const [fibFeedback, setFibFeedback] = useState<FillInBlankFeedback | null>(null);
+  const [userResponse, setUserResponse] = useState("");
   const [isCompleted, setIsCompleted] = useState(false);
+  const [isEvaluating, setIsEvaluating] = useState(false);
   
   // 添加本地存储功能
   const [progress, setProgress] = useLocalStorage<TrainingProgress>("trainingProgress", {
@@ -104,7 +107,10 @@ export default function TrainingMode({ userPreferences }: TrainingModeProps) {
     setCurrentFIBScenario(randomScenario);
     setCurrentMCScenario(null);
     setMCFeedback(null);
+    setFibFeedback(null);
+    setUserResponse("");
     setIsCompleted(false);
+    setIsEvaluating(false);
   };
 
   const handleMultipleChoiceAnswer = (optionId: string) => {
@@ -145,11 +151,106 @@ export default function TrainingMode({ userPreferences }: TrainingModeProps) {
     }
   };
 
+  const handleFillInBlankAnswer = async (response: string) => {
+    if (!currentFIBScenario || isCompleted || !response.trim() || isEvaluating) return;
+    
+    setIsEvaluating(true);
+    
+    try {
+      // 调用AI评估API
+      const evaluationResponse = await fetch('/api/training/evaluate', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          userAnswer: response,
+          standardAnswer: currentFIBScenario.standardAnswer,
+          idealResponsePoints: currentFIBScenario.idealResponsePoints,
+          puaText: currentFIBScenario.puaText,
+          category: currentFIBScenario.category,
+          language: userPreferences.language
+        }),
+      });
+
+      if (!evaluationResponse.ok) {
+        throw new Error('评估请求失败');
+      }
+
+      const evaluation = await evaluationResponse.json();
+      
+      const feedback: FillInBlankFeedback = {
+        score: evaluation.score,
+        strengths: evaluation.strengths,
+        improvements: evaluation.improvements,
+        suggestions: evaluation.suggestions,
+        comparison: evaluation.comparison
+      };
+      
+      setFibFeedback(feedback);
+      setIsCompleted(true);
+      
+      // 更新进度
+      if (!progress?.completedScenarios?.includes(currentFIBScenario.id)) {
+        const newProgress = {
+          ...progress,
+          completedScenarios: [...(progress?.completedScenarios || []), currentFIBScenario.id],
+          totalScore: (progress?.totalScore || 0) + evaluation.score,
+          lastTrainingDate: Date.now(),
+          multipleChoiceStats: progress?.multipleChoiceStats || {
+            totalAttempts: 0,
+            correctAnswers: 0,
+            averageScore: 0
+          },
+          fillInBlankStats: {
+            totalAttempts: (progress?.fillInBlankStats?.totalAttempts || 0) + 1,
+            averageScore: (((progress?.fillInBlankStats?.averageScore || 0) * (progress?.fillInBlankStats?.totalAttempts || 0)) + evaluation.score) / ((progress?.fillInBlankStats?.totalAttempts || 0) + 1),
+            improvementTrend: [...(progress?.fillInBlankStats?.improvementTrend || []), evaluation.score].slice(-10)
+          }
+        };
+        setProgress(newProgress);
+      }
+    } catch (error) {
+      console.error('AI评估失败:', error);
+      
+      // 如果AI评估失败，使用备用的简化评分逻辑
+      const responseLength = response.length;
+      const idealPoints = currentFIBScenario.idealResponsePoints;
+      let score = 5; // 基础分数
+      
+      if (responseLength >= 50) score += 2;
+      if (responseLength >= 100) score += 1;
+      
+      const keywordMatches = idealPoints.filter(point => 
+        response.toLowerCase().includes(point.toLowerCase().substring(0, 5))
+      ).length;
+      
+      score += Math.min(keywordMatches, 2);
+      score = Math.min(score, 10);
+      
+      const fallbackFeedback: FillInBlankFeedback = {
+        score,
+        strengths: score >= 7 ? ["表达清晰", "设立了界限"] : ["有回应意识"],
+        improvements: score < 7 ? ["可以更直接地拒绝操控", "可以更坚定地表达界限"] : [],
+        suggestions: "网络连接问题，无法进行AI评分。参考标准答案，学习更有效的表达方式",
+        comparison: `由于网络问题使用简化评分：${score >= 7 ? "回应较好地体现了关键要点" : "还需要更明确地表达界限"}`
+      };
+      
+      setFibFeedback(fallbackFeedback);
+      setIsCompleted(true);
+    } finally {
+      setIsEvaluating(false);
+    }
+  };
+
   const resetTraining = () => {
     setCurrentMCScenario(null);
     setCurrentFIBScenario(null);
     setMCFeedback(null);
+    setFibFeedback(null);
+    setUserResponse("");
     setIsCompleted(false);
+    setIsEvaluating(false);
   };
 
   const getDifficultyLabel = (difficulty: string) => {
@@ -493,14 +594,72 @@ export default function TrainingMode({ userPreferences }: TrainingModeProps) {
                       : "Type your response here..."}
                     className="min-h-[100px]"
                     disabled={isCompleted}
+                    value={userResponse}
+                    onChange={(e) => setUserResponse(e.target.value)}
                   />
                   <Button 
                     className="w-full"
-                    disabled={isCompleted}
-                    onClick={() => alert(userPreferences.language === "zh" ? "填空题评分功能开发中..." : "Fill-in-blank scoring in development...")}
+                    disabled={isCompleted || isEvaluating}
+                    onClick={() => handleFillInBlankAnswer(userResponse)}
                   >
-                    {userPreferences.language === "zh" ? "提交回应" : "Submit Response"}
+                    {isEvaluating 
+                      ? (userPreferences.language === "zh" ? "AI评估中..." : "AI Evaluating...")
+                      : (userPreferences.language === "zh" ? "提交回应" : "Submit Response")
+                    }
                   </Button>
+                </div>
+              )}
+              
+              {fibFeedback && (
+                <div className="space-y-4 mt-4">
+                  <div className="flex items-center justify-between">
+                    <h3 className="font-medium">
+                      {userPreferences.language === "zh" ? "反馈" : "Feedback"}
+                    </h3>
+                    <Badge variant={fibFeedback.score >= 7 ? "default" : fibFeedback.score >= 5 ? "outline" : "destructive"}>
+                      {userPreferences.language === "zh" ? "分数：" : "Score: "}{fibFeedback.score}/10
+                    </Badge>
+                  </div>
+                  
+                  <div className="grid gap-3">
+                    {fibFeedback.strengths.length > 0 && (
+                      <div className="bg-green-50 dark:bg-green-950 p-3 rounded-lg">
+                        <h4 className="font-medium text-green-800 dark:text-green-300 mb-2">
+                          {userPreferences.language === "zh" ? "优点" : "Strengths"}
+                        </h4>
+                        <ul className="text-sm text-muted-foreground space-y-1">
+                          {fibFeedback.strengths.map((strength, index) => (
+                            <li key={index}>• {strength}</li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+                    
+                    {fibFeedback.improvements.length > 0 && (
+                      <div className="bg-amber-50 dark:bg-amber-950 p-3 rounded-lg">
+                        <h4 className="font-medium text-amber-800 dark:text-amber-300 mb-2">
+                          {userPreferences.language === "zh" ? "改进建议" : "Improvements"}
+                        </h4>
+                        <ul className="text-sm text-muted-foreground space-y-1">
+                          {fibFeedback.improvements.map((improvement, index) => (
+                            <li key={index}>• {improvement}</li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+                    
+                    <div className="bg-blue-50 dark:bg-blue-950 p-3 rounded-lg">
+                      <h4 className="font-medium text-blue-800 dark:text-blue-300 mb-2">
+                        {userPreferences.language === "zh" ? "标准答案" : "Standard Answer"}
+                      </h4>
+                      <p className="text-sm text-muted-foreground mb-2">
+                        {currentFIBScenario?.standardAnswer}
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        {currentFIBScenario?.answerExplanation}
+                      </p>
+                    </div>
+                  </div>
                 </div>
               )}
             </CardContent>
